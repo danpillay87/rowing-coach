@@ -75,6 +75,26 @@
   .stage video { background: #000; }
   /* Mirror is applied dynamically in JS (front cameras), so video + canvas stay aligned. */
 
+  /* Glanceable HUD -- overlaid on the video so the key feedback is readable
+     from rowing distance (phone propped ~2-3 m away). Hidden until running. */
+  .hud { position: absolute; inset: 0; display: none; flex-direction: column;
+         justify-content: space-between; padding: 12px; pointer-events: none; gap: 10px; }
+  .stage.running .hud { display: flex; }
+  .hud-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .hud-spm { background: rgba(11,15,20,.58); border-radius: 12px; padding: 4px 14px; text-align: center; }
+  .hud-spm b { display: block; font-size: clamp(32px, 9vw, 66px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .hud-spm small { font-size: clamp(10px, 2.4vw, 14px); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+  .hud-phase { font-size: clamp(13px, 3.2vw, 20px); font-weight: 800; padding: 8px 14px; border-radius: 999px;
+               background: rgba(11,15,20,.58); align-self: flex-start; letter-spacing: .04em; }
+  .hud-cue { text-align: center; font-weight: 800; line-height: 1.08;
+             font-size: clamp(27px, 7.6vw, 58px); padding: 14px 16px; border-radius: 16px;
+             background: rgba(11,15,20,.62); transition: color .2s, background .2s; }
+  .hud-cue.good { color: var(--good); }
+  .hud-cue.warn { color: var(--warn); }
+  .hud-cue.bad  { color: #fff; background: rgba(255,93,93,.85); }
+  .hud-cue.idle { color: var(--muted); font-weight: 700; font-size: clamp(18px, 5vw, 32px); }
+  .stage.fault { outline: 6px solid var(--bad); outline-offset: -6px; }
+
   /* Status overlay -- shown over the stage for load / error / reposition hints. */
   .overlay {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -107,7 +127,7 @@
     transition: background .25s, border-color .25s, color .25s;
   }
   .cue .cue-label { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
-  .cue .cue-text { font-size: 16px; font-weight: 650; line-height: 1.3; }
+  .cue .cue-text { font-size: 20px; font-weight: 650; line-height: 1.3; }
   .cue .cue-sub { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
   .cue.good { background: rgba(47,208,122,.10); border-color: rgba(47,208,122,.45); }
   .cue.good .cue-text { color: var(--good); }
@@ -178,6 +198,13 @@
         <!-- muted + playsinline are required for autoplay on iOS Safari -->
         <video id="video" playsinline muted></video>
         <canvas id="canvas"></canvas>
+        <div class="hud" id="hud">
+          <div class="hud-top">
+            <div class="hud-spm"><b id="hudSpm">&ndash;</b><small>spm</small></div>
+            <div class="hud-phase" id="hudPhase">READY</div>
+          </div>
+          <div class="hud-cue idle" id="hudCue">Start rowing</div>
+        </div>
         <div class="overlay" id="overlay">
           <div class="card">
             <h3 id="ovTitle">On-device rowing coach</h3>
@@ -311,6 +338,7 @@ const ovText     = document.getElementById("ovText");
 const startBtn   = document.getElementById("startBtn");
 const flipBtn    = document.getElementById("flipSideBtn");
 const cameraBtn  = document.getElementById("cameraBtn");
+const stage      = document.getElementById("stage");
 
 const el = {
   spm:      document.getElementById("mSpm"),
@@ -324,6 +352,9 @@ const el = {
   cue:      document.getElementById("cue"),
   cueText:  document.getElementById("cueText"),
   cueSub:   document.getElementById("cueSub"),
+  hudSpm:   document.getElementById("hudSpm"),
+  hudPhase: document.getElementById("hudPhase"),
+  hudCue:   document.getElementById("hudCue"),
 };
 
 // ---------------------------------------------------------------------------
@@ -902,6 +933,13 @@ function renderUI() {
   el.cue.className = "cue " + (S.cue.level || "idle");
   el.cueText.textContent = S.cue.text || "…";
   el.cueSub.textContent = S.cue.sub || "";
+
+  // Glanceable HUD overlaid on the video (readable from rowing distance).
+  el.hudSpm.textContent = isFiniteNum(spm) ? String(round(spm)) : "–";
+  el.hudPhase.textContent = S.phase === "idle" ? "READY" : S.phase.toUpperCase();
+  el.hudCue.textContent = S.cue.text || "…";
+  el.hudCue.className = "hud-cue " + (S.cue.level || "idle");
+  stage.classList.toggle("fault", S.backOpenFault && S.phase === "drive");
 }
 
 // ===========================================================================
@@ -993,6 +1031,7 @@ async function start() {
   }
   hideOverlay();
   S.running = true;
+  stage.classList.add("running");
   startBtn.textContent = "Stop";
   startBtn.classList.add("stop");
   flipBtn.disabled = false;
@@ -1003,6 +1042,7 @@ async function start() {
 
 function stop() {
   S.running = false;
+  stage.classList.remove("running", "fault");
   stopStreamTracks();
   video.pause();
   video.srcObject = null;
