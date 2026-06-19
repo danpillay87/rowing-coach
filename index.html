@@ -9,8 +9,9 @@
   /*
    * ----------------------------------------------------------------------
    *  Rowing Form Coach -- styles
-   *  Mobile-first. The stage (video + canvas) scales to the viewport,
-   *  metric cards reflow from a single column (phone) to a grid (desktop).
+   *  Mobile-first, FEEDBACK-FIRST. The big per-stroke verdict + sequencing
+   *  strip + trend dots dominate; the camera is dimmed behind a scrim so the
+   *  coaching read is what you see from ~2-3 m away. Reflows to a desktop grid.
    * ----------------------------------------------------------------------
    */
   :root {
@@ -20,10 +21,10 @@
     --line: #26323f;
     --text: #e8eef5;
     --muted: #93a4b5;
-    --good: #2fd07a;     /* green  -- sequence good */
+    --good: #2fd07a;     /* green  -- stroke is clean */
     --good-dim: #1c6b44;
-    --warn: #ffb02e;     /* amber  -- caution / trunk highlight */
-    --bad: #ff5d5d;      /* red    -- priority fault */
+    --warn: #ffb02e;     /* amber  -- one-off / minor issue */
+    --bad: #ff5d5d;      /* red    -- real, repeated fault */
     --accent: #4aa8ff;
     --skeleton: #6fe3ff;
     --shadow: 0 6px 24px rgba(0,0,0,.35);
@@ -58,7 +59,7 @@
   /* Layout: stage on the left/top, coaching panel beside/below it. */
   .layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
   @media (min-width: 880px) {
-    .layout { grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr); align-items: start; }
+    .layout { grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); align-items: start; }
   }
 
   /* Stage: the video and the overlay canvas share one box. */
@@ -74,42 +75,91 @@
     position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: contain;            /* letterbox -- never crop the rower */
   }
-  .stage video { background: #000; }
+  .stage video { background: #000; transition: opacity .3s; }
+  /* FEEDBACK-FIRST: the raw video is dimmed (opacity + dark scrim) so the
+     verdict + sequencing read dominates. The skeleton overlay stays crisp.
+     A "show video" toggle removes the scrim for the odd setup check. */
+  .stage.dimvideo video { opacity: 0.32; }
+  .stage .scrim {
+    position: absolute; inset: 0; pointer-events: none;
+    background: rgba(8,11,15,.46); transition: opacity .3s; display: none;
+  }
+  .stage.running.dimvideo .scrim { display: block; }
   /* Mirror is applied dynamically in JS (front cameras), so video + canvas stay aligned. */
 
   /* Glanceable HUD -- overlaid on the video so the key feedback is readable
-     from rowing distance (phone propped ~2-3 m away). Hidden until running. */
+     from rowing distance (phone propped ~2-3 m away). Hidden until running.
+     Stacked: top row (SPM + phase), big verdict, sequencing strip, trend dots. */
   .hud { position: absolute; inset: 0; display: none; flex-direction: column;
-         justify-content: space-between; padding: 12px; pointer-events: none; gap: 10px; }
+         justify-content: space-between; padding: 12px; pointer-events: none; gap: 8px; }
   .stage.running .hud { display: flex; }
   .hud-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-  .hud-spm { background: rgba(11,15,20,.58); border-radius: 12px; padding: 4px 14px; text-align: center; }
-  .hud-spm b { display: block; font-size: clamp(32px, 9vw, 66px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .hud-spm { background: rgba(11,15,20,.62); border-radius: 12px; padding: 4px 14px; text-align: center; }
+  .hud-spm b { display: block; font-size: clamp(30px, 8vw, 60px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .hud-spm small { font-size: clamp(10px, 2.4vw, 14px); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
   .hud-phase { font-size: clamp(13px, 3.2vw, 20px); font-weight: 800; padding: 8px 14px; border-radius: 999px;
-               background: rgba(11,15,20,.58); align-self: flex-start; letter-spacing: .04em; }
+               background: rgba(11,15,20,.62); align-self: flex-start; letter-spacing: .04em; }
+  .hud-phase.drive { color: var(--accent); }
+  .hud-phase.recovery { color: var(--muted); }
+
+  /* The big PER-STROKE verdict. Updates only when a stroke completes (~2-3s),
+     so it never strobes frame-to-frame. Colour + headline + one detail line. */
+  .hud-mid { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
   .hud-cue { text-align: center; font-weight: 800; line-height: 1.08;
-             font-size: clamp(27px, 7.6vw, 58px); padding: 14px 16px; border-radius: 16px;
-             background: rgba(11,15,20,.62); transition: color .2s, background .2s; }
+             font-size: clamp(24px, 6.8vw, 52px); padding: 12px 16px; border-radius: 16px;
+             background: rgba(11,15,20,.66); transition: color .25s, background .25s; }
+  .hud-cue .sub { display: block; font-weight: 600; color: var(--muted);
+                  font-size: clamp(12px, 3vw, 18px); margin-top: 6px; line-height: 1.25; }
   .hud-cue.good { color: var(--good); }
   .hud-cue.warn { color: var(--warn); }
-  .hud-cue.bad  { color: #fff; background: rgba(255,93,93,.85); }
-  .hud-cue.idle { color: var(--muted); font-weight: 700; font-size: clamp(18px, 5vw, 32px); }
-  .stage.fault { outline: 6px solid var(--bad); outline-offset: -6px; }
+  .hud-cue.bad  { color: #fff; background: rgba(255,93,93,.88); }
+  .hud-cue.bad .sub { color: rgba(255,255,255,.85); }
+  .hud-cue.idle { color: var(--muted); font-weight: 700; font-size: clamp(17px, 4.6vw, 30px); }
+
+  /* SEQUENCING STRIP -- three segments LEGS -> BODY -> ARMS for the last stroke.
+     Glanceable: the offender turns amber/red with a "too early" marker. */
+  .seq { display: flex; gap: 6px; align-items: stretch; }
+  .seq .seg {
+    flex: 1 1 0; border-radius: 11px; padding: 8px 6px; text-align: center;
+    background: rgba(11,15,20,.66); border: 2px solid rgba(255,255,255,.08);
+    transition: background .25s, border-color .25s, color .25s;
+    min-width: 0;
+  }
+  .seq .seg .lab { font-size: clamp(12px, 3.2vw, 19px); font-weight: 800; letter-spacing: .06em; line-height: 1.1; }
+  .seq .seg .ord { font-size: clamp(9px, 2.2vw, 12px); color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .06em; min-height: 1.1em; }
+  .seq .seg.ok   { border-color: rgba(47,208,122,.55); color: var(--good); }
+  .seq .seg.ok .ord { color: rgba(47,208,122,.8); }
+  .seq .seg.warn { border-color: rgba(255,176,46,.7); color: var(--warn); background: rgba(255,176,46,.12); }
+  .seq .seg.warn .ord { color: var(--warn); }
+  .seq .seg.bad  { border-color: rgba(255,93,93,.8); color: #fff; background: rgba(255,93,93,.55); }
+  .seq .seg.bad .ord { color: #fff; }
+  .seq .arrow { align-self: center; color: var(--muted); font-size: clamp(13px, 3.4vw, 22px); font-weight: 700; }
+  .stage:not(.running) .hud-mid { visibility: hidden; }
+
+  /* TREND DOTS -- last ~6 strokes' verdicts. Trend/consistency at a glance. */
+  .trend { display: flex; gap: 7px; align-items: center; justify-content: center;
+           background: rgba(11,15,20,.58); border-radius: 999px; padding: 7px 12px; align-self: center; }
+  .trend .tlab { font-size: clamp(9px, 2.2vw, 12px); color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-right: 2px; }
+  .trend .tdot { width: clamp(11px, 2.8vw, 16px); height: clamp(11px, 2.8vw, 16px); border-radius: 50%; background: var(--line); }
+  .trend .tdot.good { background: var(--good); }
+  .trend .tdot.warn { background: var(--warn); }
+  .trend .tdot.bad  { background: var(--bad); }
 
   /* Short viewports (landscape phones): trim chrome so the stage + HUD fit. */
   @media (max-height: 560px) {
     .wrap { padding: 8px 10px 16px; }
     header { margin-bottom: 6px; }
+    .hud { gap: 5px; padding: 9px; }
+    .hud-cue { padding: 9px 12px; }
   }
 
   /* Status overlay -- shown over the stage for load / error / reposition hints. */
   .overlay {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    text-align: center; padding: 22px; pointer-events: none;
+    text-align: center; padding: 22px; pointer-events: none; z-index: 3;
   }
   .overlay .card {
-    background: rgba(11,15,20,.82); border: 1px solid var(--line);
+    background: rgba(11,15,20,.86); border: 1px solid var(--line);
     border-radius: 12px; padding: 16px 18px; max-width: 320px; pointer-events: auto;
     backdrop-filter: blur(3px);
   }
@@ -128,7 +178,8 @@
     border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
   }
 
-  /* The single prioritised cue. Colour-coded via .good / .warn / .bad. */
+  /* The per-stroke verdict (panel copy of the HUD verdict). Updates only when
+     a stroke completes, so it reads as a steady judgement, not a strobe. */
   .cue {
     border-radius: 12px; padding: 14px 14px; margin-bottom: 14px;
     border: 1px solid var(--line); background: var(--panel-2);
@@ -181,6 +232,7 @@
   button:disabled { opacity: .45; cursor: not-allowed; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
   button.primary.stop { background: var(--bad); border-color: var(--bad); color: #2a0606; }
+  button.ghost { flex: 0 0 auto; font-size: 13px; padding: 9px 13px; min-height: 40px; }
 
   .hint { color: var(--muted); font-size: 12.5px; margin-top: 12px; }
   .hint code { background: var(--panel-2); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
@@ -190,6 +242,46 @@
   .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 12px; height: 4px; border-radius: 3px; display: inline-block; }
+
+  /* ===================== DEBUG / TELEMETRY PANEL ===================== */
+  /* Collapsible (default collapsed). Surfaces the raw numbers so the stroke
+     detection / ratio / fault logic can be verified, plus a per-stroke log. */
+  .debug { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius);
+           background: var(--panel); overflow: hidden; }
+  .debug > summary {
+    cursor: pointer; list-style: none; padding: 12px 14px; font-weight: 700; font-size: 13.5px;
+    display: flex; align-items: center; gap: 8px; user-select: none;
+  }
+  .debug > summary::-webkit-details-marker { display: none; }
+  .debug > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+  .debug[open] > summary::before { transform: rotate(90deg); }
+  .debug > summary .tag { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--muted);
+                          background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+  .debug-body { padding: 0 14px 14px; }
+  .debug h4 { margin: 10px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+  /* Live values grid. */
+  .live { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; }
+  @media (min-width: 520px) { .live { grid-template-columns: repeat(3, 1fr); } }
+  .live .lv { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px;
+              padding: 4px 0; border-bottom: 1px dashed var(--line); }
+  .live .lv .lk { color: var(--muted); }
+  .live .lv .lvv { font-variant-numeric: tabular-nums; font-weight: 650; }
+
+  /* Per-stroke log table -- horizontally scrollable on a phone. */
+  .logwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+  table.log { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.log th, table.log td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+  table.log th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: .04em; position: sticky; top: 0; background: var(--panel); }
+  table.log td:first-child, table.log th:first-child { text-align: left; }
+  table.log tr.v-good td.verdict { color: var(--good); }
+  table.log tr.v-warn td.verdict { color: var(--warn); }
+  table.log tr.v-bad  td.verdict { color: var(--bad); font-weight: 700; }
+  table.log .yes { color: var(--bad); font-weight: 700; }
+  table.log .no  { color: var(--muted); }
+  .log-empty { color: var(--muted); font-size: 12.5px; padding: 8px 2px; }
+  .debug-actions { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+  .debug-note { color: var(--muted); font-size: 11.5px; }
 </style>
 </head>
 <body>
@@ -202,17 +294,39 @@
   <div class="layout">
     <!-- ============================ STAGE ============================ -->
     <div>
-      <div class="stage" id="stage">
+      <!-- dimvideo class = feedback-first (scrim + dimmed video). Toggled off
+           by the "show video" button. -->
+      <div class="stage dimvideo" id="stage">
         <!-- muted + playsinline are required for autoplay on iOS Safari -->
         <video id="video" playsinline muted></video>
         <canvas id="canvas"></canvas>
+        <div class="scrim"></div>
         <div class="hud" id="hud">
           <div class="hud-top">
             <div class="hud-spm"><b id="hudSpm">&ndash;</b><small>spm</small></div>
             <div class="hud-phase" id="hudPhase">READY</div>
           </div>
-          <div class="hud-cue idle" id="hudCue">Start rowing</div>
+
+          <!-- Per-stroke verdict + sequencing strip (the dominant read). -->
+          <div class="hud-mid">
+            <div class="hud-cue idle" id="hudCue">Start rowing<span class="sub" id="hudCueSub"></span></div>
+            <div class="seq" id="seqStrip">
+              <div class="seg" id="segLegs"><div class="lab">LEGS</div><div class="ord" id="ordLegs"></div></div>
+              <div class="arrow">&rsaquo;</div>
+              <div class="seg" id="segBody"><div class="lab">BODY</div><div class="ord" id="ordBody"></div></div>
+              <div class="arrow">&rsaquo;</div>
+              <div class="seg" id="segArms"><div class="lab">ARMS</div><div class="ord" id="ordArms"></div></div>
+            </div>
+          </div>
+
+          <!-- Trend dots: last strokes' verdicts. -->
+          <div class="trend" id="trend">
+            <span class="tlab">last</span>
+            <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+            <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+          </div>
         </div>
+
         <div class="overlay" id="overlay">
           <div class="card">
             <h3 id="ovTitle">On-device rowing coach</h3>
@@ -225,21 +339,23 @@
         <button id="startBtn" class="primary">Start</button>
         <button id="flipSideBtn" disabled title="Use when you face the other way">Flip side: AUTO</button>
         <button id="cameraBtn" disabled title="Switch front / rear camera">Switch camera</button>
+        <button id="videoToggleBtn" class="ghost" title="Show or dim the camera feed">Show video</button>
       </div>
 
       <p class="hint">
         Tip: prop your phone or laptop side-on, ~2&ndash;3&nbsp;m away, so the camera sees your
-        whole body from the side (head to feet). Good light helps a lot.
+        whole body from the side (head to feet). Good light helps a lot. The feed is
+        dimmed on purpose so the coaching read stands out &mdash; tap <strong>Show video</strong> to check framing.
       </p>
     </div>
 
     <!-- ========================= COACH PANEL ========================= -->
     <div class="panel">
-      <!-- The one prioritised coaching cue. -->
+      <!-- The per-stroke verdict (mirrors the big HUD verdict). -->
       <div class="cue idle" id="cue">
-        <div class="cue-label">Coaching cue</div>
+        <div class="cue-label">This stroke</div>
         <div class="cue-text" id="cueText">Waiting to start&hellip;</div>
-        <div class="cue-sub" id="cueSub">One cue at a time, by priority.</div>
+        <div class="cue-sub" id="cueSub">One verdict per stroke &mdash; it won&rsquo;t flicker.</div>
       </div>
 
       <div class="metrics">
@@ -278,12 +394,54 @@
         trunk lean and knee angle, and tracks your hip sliding back-and-forth to split each
         stroke into Drive and Recovery. The headline fault it hunts for is the
         <strong>early back-opening</strong> &mdash; the back swinging open before the legs finish.
+        Each completed stroke gets <strong>one steady verdict</strong>; red only shows when the
+        same fault keeps recurring.
         <div class="legend">
           <span><i style="background:var(--skeleton)"></i> skeleton</span>
-          <span><i style="background:var(--warn)"></i> trunk (fault highlight)</span>
-          <span><i style="background:var(--good)"></i> good</span>
+          <span><i style="background:var(--good)"></i> clean</span>
+          <span><i style="background:var(--warn)"></i> one-off</span>
+          <span><i style="background:var(--bad)"></i> repeated fault</span>
         </div>
       </footer>
+
+      <!-- ===================== DEBUG / TELEMETRY ===================== -->
+      <details class="debug" id="debug">
+        <summary>Debug &amp; telemetry<span class="tag">raw numbers</span></summary>
+        <div class="debug-body">
+          <h4>Live (per frame)</h4>
+          <div class="live" id="live">
+            <div class="lv"><span class="lk">Side</span><span class="lvv" id="dvSide">&ndash;</span></div>
+            <div class="lv"><span class="lk">Phase</span><span class="lvv" id="dvPhase">&ndash;</span></div>
+            <div class="lv"><span class="lk">Vis OK</span><span class="lvv" id="dvVis">&ndash;</span></div>
+            <div class="lv"><span class="lk">Trunk lean&deg;</span><span class="lvv" id="dvLean">&ndash;</span></div>
+            <div class="lv"><span class="lk">Knee&deg;</span><span class="lvv" id="dvKnee">&ndash;</span></div>
+            <div class="lv"><span class="lk">Leg ext 0-1</span><span class="lvv" id="dvLegExt">&ndash;</span></div>
+            <div class="lv"><span class="lk">legProgress</span><span class="lvv" id="dvLegProg">&ndash;</span></div>
+            <div class="lv"><span class="lk">backOpening&deg;</span><span class="lvv" id="dvBackOpen">&ndash;</span></div>
+            <div class="lv"><span class="lk">fault (live)</span><span class="lvv" id="dvFault">&ndash;</span></div>
+          </div>
+
+          <h4>Per-stroke log (last 12)</h4>
+          <div class="logwrap">
+            <table class="log">
+              <thead>
+                <tr>
+                  <th>#</th><th>spm</th><th>drive s</th><th>recov s</th><th>ratio</th>
+                  <th>catch&deg;</th><th>min knee&deg;</th><th>back early?</th><th>verdict</th>
+                </tr>
+              </thead>
+              <tbody id="logBody">
+                <tr><td colspan="9" class="log-empty">No strokes logged yet &mdash; start rowing.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="debug-actions">
+            <button id="copyLogBtn" class="ghost">Copy log (JSON)</button>
+            <span class="debug-note" id="copyNote">Copies the per-stroke log so you can paste it back.</span>
+          </div>
+        </div>
+      </details>
     </div>
   </div>
 </div>
@@ -346,6 +504,7 @@ const ovText     = document.getElementById("ovText");
 const startBtn   = document.getElementById("startBtn");
 const flipBtn    = document.getElementById("flipSideBtn");
 const cameraBtn  = document.getElementById("cameraBtn");
+const videoToggleBtn = document.getElementById("videoToggleBtn");
 const stage      = document.getElementById("stage");
 
 const el = {
@@ -363,6 +522,29 @@ const el = {
   hudSpm:   document.getElementById("hudSpm"),
   hudPhase: document.getElementById("hudPhase"),
   hudCue:   document.getElementById("hudCue"),
+  hudCueSub:document.getElementById("hudCueSub"),
+  // Sequencing strip segments + order labels.
+  segLegs:  document.getElementById("segLegs"),
+  segBody:  document.getElementById("segBody"),
+  segArms:  document.getElementById("segArms"),
+  ordLegs:  document.getElementById("ordLegs"),
+  ordBody:  document.getElementById("ordBody"),
+  ordArms:  document.getElementById("ordArms"),
+  trend:    document.getElementById("trend"),
+  // Debug panel.
+  dvSide:   document.getElementById("dvSide"),
+  dvPhase:  document.getElementById("dvPhase"),
+  dvVis:    document.getElementById("dvVis"),
+  dvLean:   document.getElementById("dvLean"),
+  dvKnee:   document.getElementById("dvKnee"),
+  dvLegExt: document.getElementById("dvLegExt"),
+  dvLegProg:document.getElementById("dvLegProg"),
+  dvBackOpen:document.getElementById("dvBackOpen"),
+  dvFault:  document.getElementById("dvFault"),
+  logBody:  document.getElementById("logBody"),
+  copyLogBtn: document.getElementById("copyLogBtn"),
+  copyNote: document.getElementById("copyNote"),
+  debug:    document.getElementById("debug"),
 };
 
 // ---------------------------------------------------------------------------
@@ -394,6 +576,8 @@ const round = (n, d = 0) => {
   const f = Math.pow(10, d);
   return Math.round(n * f) / f;
 };
+/** Round to a number for display, or return a dash string when not finite. */
+const rOr = (n, d = 0) => { const r = round(n, d); return r == null ? "–" : String(r); };
 const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
 function stdev(a) {
   if (a.length < 2) return 0;
@@ -418,15 +602,27 @@ const S = {
   kneeSm: NaN,              // hip-knee-ankle interior angle
   hipXSm: NaN,              // smoothed hip horizontal position (the stroke signal)
   kneeNormSm: NaN,          // smoothed leg-extension proxy 0..1 (0=compressed,1=straight)
+  armCloseSm: NaN,          // smoothed wrist->shoulder horizontal closeness (arm-draw proxy)
+  armCloseCatch: NaN,       // arm closeness captured at the catch (arm-draw onset baseline)
+
+  // Live fault diagnostics (for the debug panel; not displayed as the verdict)
+  liveLegProgress: NaN,     // current legProgress within the drive
+  liveBackOpening: NaN,     // current backOpening deg within the drive
 
   // Stroke segmentation -----------------------------------------------------
-  signalBuf: [],            // recent {t, hipX, kneeNorm, lean} samples for peak finding
+  signalBuf: [],            // recent {t, sig, lean, kneeNorm} samples for peak finding
   phase: "idle",            // "drive" | "recovery" | "idle"
-  lastCatch: null,          // {t, hipX, lean, kneeNorm} of the last detected catch
-  lastFinish: null,         // {t, hipX} of the last detected finish
+  lastCatch: null,          // {t, sig, lean, kneeNorm} of the last detected catch
+  lastFinish: null,         // {t, sig} of the last detected finish
   driveStart: null,         // timestamp drive began (= catch time)
   recoveryStart: null,      // timestamp recovery began (= finish time)
-  lastStrokeT: null,        // timestamp of previous catch (for SPM period)
+
+  // Within-drive sequencing timestamps (reset each catch) -------------------
+  // Captured to reconstruct the LEGS -> BODY -> ARMS engagement order.
+  tLegsGo: null,            // first time legs passed the "moving" threshold
+  tBodyGo: null,            // first time the back started opening past a small deadband
+  tArmsGo: null,            // first time the arms started drawing in
+  minKneeThisDrive: NaN,    // min knee angle seen this drive (catch compression)
 
   // Per-stroke history (rolling, last ~5) for consistency + cues ------------
   strokeCount: 0,
@@ -440,13 +636,16 @@ const S = {
   catchLean: NaN,           // trunk lean captured at the catch
   backOpenFault: false,     // latched true within a drive once early opening seen
   faultStrokes: 0,          // how many of the recent strokes had the fault
-  recentFaults: [],         // rolling booleans, last ~5 strokes
+  recentFaults: [],         // rolling booleans (0/1), last ~5 strokes
+
+  // Per-stroke verdict (THE stable display value; recomputed once per stroke)
+  verdict: { level: "idle", headline: "Start rowing", detail: "Take a few strokes and I'll read your sequencing." },
+  verdicts: [],             // rolling list of recent verdict levels (for trend dots)
+  lastSeq: null,            // {order:[...], offender, legsFirst} for the sequencing strip
+  strokeLog: [],            // rolling per-stroke telemetry objects (last LOG_MAX) -- debug panel reads this
 
   // Visibility / framing ----------------------------------------------------
   visOk: false,             // are the key side landmarks confidently visible?
-
-  // Live coaching cue (sticky so it doesn't flicker frame-to-frame) ---------
-  cue: { level: "idle", text: "", sub: "", until: 0 },
 };
 
 // Tunables (documented inline where used).
@@ -458,10 +657,86 @@ const CFG = {
   MIN_HALF_MS: 250,         // min time between a catch & finish (debounce noise)
   VIS_THRESH: 0.5,          // landmark visibility score required
   HISTORY: 5,               // strokes kept for consistency + fault rate
+  LOG_MAX: 12,              // per-stroke rows kept in the debug log
+  TREND_MAX: 6,             // verdict dots shown in the trend strip
+
   // Early back-opening detection thresholds (see detectDriveFault):
   BACK_OPEN_LEAN_DELTA: 8,  // deg of trunk opening from the catch that counts as "swinging"
   LEG_DONE_FRAC: 0.6,       // legs considered "substantially extended" past 60% of their range
+
+  // Sequencing-strip engagement thresholds (see updateSequencing):
+  LEGS_GO_FRAC: 0.12,       // legProgress past which we say the legs have "engaged"
+  BODY_GO_DELTA: 4,         // deg of back-opening past which the body has "engaged"
+  ARMS_GO_DELTA: 0.04,      // wrist->shoulder closeness drop that means arms have "engaged"
+
+  // Persistence / "don't cry wolf" --------------------------------------------
+  BAD_RECUR_MIN: 3,         // same fault in >= this many of the last 5 strokes -> RED
+  RATIO_WARN: 1.5,          // drive:recovery above this -> recovery too rushed (amber)
+  COMPRESS_WARN_KNEE: 55,   // min knee below this -> over-compression at the catch (amber)
 };
+
+// ===========================================================================
+//  TELEMETRY HOOK  (centralised; stream-ready)
+//  --------------------------------------------------------------------------
+//  emitStroke(obj) is the SINGLE choke-point for a completed stroke. It:
+//    (a) pushes the per-stroke object onto S.strokeLog (the in-memory log the
+//        debug panel + "Copy log" button read), capped at CFG.LOG_MAX, and
+//    (b) fires postTelemetry(obj) -- an async no-op stub today, the future
+//        seam for streaming the derived NUMBERS (never frames) to Reachy.
+//
+//  PER-STROKE TELEMETRY OBJECT SHAPE (documented contract):
+//    {
+//      stroke:    number,   // 1-based stroke index in this session
+//      t:         number,   // ms timestamp (performance.now) at the catch that closed the stroke
+//      spm:       number,   // stroke rate for this stroke = 60 / period
+//      period:    number,   // full cycle seconds (catch -> next catch)
+//      driveS:    number,   // drive duration seconds (catch -> finish)
+//      recoveryS: number,   // recovery duration seconds (finish -> next catch)
+//      ratio:     number,   // drive : recovery ratio (driveS / recoveryS)
+//      catchLean: number,   // trunk lean degrees at the catch (+forward / -layback)
+//      minKnee:   number,   // smallest knee angle seen during the drive (catch compression)
+//      strokeLen: number,   // hip travel catch->finish in normalised signal units
+//      backEarly: boolean,  // did this stroke's drive trip the early back-opening fault?
+//      seqOrder:  string[], // engagement order, e.g. ["legs","body","arms"]
+//      offender:  string|null, // segment flagged out of order ("body") or null
+//      side:      string,   // "left" | "right" -- which side was read
+//      verdict:   string,   // "good" | "warn" | "bad" -- the verdict shown for this stroke
+//      headline:  string,   // short plain-English verdict headline
+//    }
+//  All numbers are rounded for readability before emit. No frame/image data.
+// ===========================================================================
+function emitStroke(obj) {
+  S.strokeLog.push(obj);
+  if (S.strokeLog.length > CFG.LOG_MAX) S.strokeLog.shift();
+  // Fire-and-forget; never blocks the render loop.
+  try { postTelemetry(obj); } catch (_) { /* telemetry must never break coaching */ }
+}
+
+/** Stream-ready stub. Today a no-op; the future home for pushing derived
+ *  numbers to a remote sink. NEVER sends frames or images. */
+async function postTelemetry(obj) {
+  // TODO: stream to Reachy (endpoint TBD)
+  // e.g. await fetch(REACHY_ENDPOINT, { method: "POST", body: JSON.stringify(obj) });
+  return;
+}
+
+/** Snapshot of the current LIVE per-frame values (numbers only). Powers the
+ *  debug panel and gives the future telemetry stream a live read if wanted. */
+function getLiveSnapshot() {
+  return {
+    side: S.chosenSide,
+    phase: S.phase,
+    visOk: S.visOk,
+    leanDeg: round(S.leanSm, 1),
+    kneeDeg: round(S.kneeSm, 1),
+    legExtension: round(S.kneeNormSm, 2),   // 0 compressed .. 1 straight
+    legProgress: round(S.liveLegProgress, 2),
+    backOpeningDeg: round(S.liveBackOpening, 1),
+    faultLive: !!(S.backOpenFault && S.phase === "drive"),
+    spm: S.periods.length ? round(60 / mean(S.periods)) : null,
+    strokes: S.strokeCount,
+  };
+}
 
 // ---------------------------------------------------------------------------
 //  Overlay status helper
@@ -593,13 +868,13 @@ function pickSide(lm) {
   return right >= left ? "right" : "left";
 }
 
-/** Pull the four key joints for the chosen side, plus a visibility check. */
+/** Pull the key joints for the chosen side, plus a visibility check. */
 function sideJoints(lm, side) {
   const idx = side === "right"
-    ? { sh: LM.R_SHOULDER, hip: LM.R_HIP, knee: LM.R_KNEE, ankle: LM.R_ANKLE, wrist: LM.R_WRIST }
-    : { sh: LM.L_SHOULDER, hip: LM.L_HIP, knee: LM.L_KNEE, ankle: LM.L_ANKLE, wrist: LM.L_WRIST };
+    ? { sh: LM.R_SHOULDER, hip: LM.R_HIP, knee: LM.R_KNEE, ankle: LM.R_ANKLE, wrist: LM.R_WRIST, elbow: LM.R_ELBOW }
+    : { sh: LM.L_SHOULDER, hip: LM.L_HIP, knee: LM.L_KNEE, ankle: LM.L_ANKLE, wrist: LM.L_WRIST, elbow: LM.L_ELBOW };
   const g = (i) => lm[i];
-  const j = { sh: g(idx.sh), hip: g(idx.hip), knee: g(idx.knee), ankle: g(idx.ankle), wrist: g(idx.wrist) };
+  const j = { sh: g(idx.sh), hip: g(idx.hip), knee: g(idx.knee), ankle: g(idx.ankle), wrist: g(idx.wrist), elbow: g(idx.elbow) };
   // Visibility OK only if the core four are present and confident.
   const v = (p) => p && isFiniteNum(p.visibility) && p.visibility >= CFG.VIS_THRESH
                      && isFiniteNum(p.x) && isFiniteNum(p.y);
@@ -641,6 +916,15 @@ function kneeAngle(j) {
 function legExtension(kneeDeg) {
   if (!isFiniteNum(kneeDeg)) return NaN;
   return clamp((kneeDeg - 70) / (175 - 70), 0, 1);
+}
+
+/** Arm-draw proxy: horizontal distance of the wrist from the shoulder,
+ *  normalised by the (roughly fixed) shoulder->hip length so it's scale-free.
+ *  Larger = arms extended (away from the body); a DROP = arms drawing in. */
+function armCloseness(j) {
+  if (!j.wrist || !isFiniteNum(j.wrist.x)) return NaN;
+  const torso = Math.max(0.05, Math.hypot(j.sh.x - j.hip.x, j.sh.y - j.hip.y));
+  return Math.abs(j.wrist.x - j.sh.x) / torso;
 }
 
 // ===========================================================================
@@ -705,9 +989,10 @@ function updateSegmentation(t, j, feetX, leanSigned, kneeNorm) {
   }
 }
 
-/** CATCH detected -> a full stroke completes here (catch -> next catch). */
+/** CATCH detected -> a full stroke completes here (catch -> next catch).
+ *  This is where we FINALISE and CLASSIFY the just-finished stroke ONCE. */
 function onCatch(sample) {
-  // Complete the previous stroke if we have a prior catch.
+  // Complete the previous stroke if we have a prior catch + finish.
   if (S.lastCatch && S.lastFinish && S.lastFinish.t > S.lastCatch.t) {
     const period = (sample.t - S.lastCatch.t) / 1000;          // seconds
     const driveT = (S.lastFinish.t - S.lastCatch.t) / 1000;    // catch->finish
@@ -715,15 +1000,47 @@ function onCatch(sample) {
     if (period > 0.6 && period < 8 && driveT > 0 && recovT > 0) {
       S.strokeCount++;
       pushCapped(S.periods, period);
-      pushCapped(S.driveRatios, driveT / recovT);
+      const ratio = driveT / recovT;
+      pushCapped(S.driveRatios, ratio);
       // Stroke length = how far the hip travelled catch->finish (signal units).
       const len = Math.abs((S.lastFinish.sig) - (S.lastCatch.sig));
       pushCapped(S.strokeLengths, len);
       // Body angle AT the catch (forward lean) -> consistency input.
-      if (isFiniteNum(S.lastCatch.lean)) pushCapped(S.catchAngles, S.lastCatch.lean);
+      const catchLean = isFiniteNum(S.lastCatch.lean) ? S.lastCatch.lean : NaN;
+      if (isFiniteNum(catchLean)) pushCapped(S.catchAngles, catchLean);
       // Record whether THIS stroke's drive had the early-back-opening fault.
       pushCapped(S.recentFaults, S.backOpenFault ? 1 : 0);
       S.faultStrokes = S.recentFaults.reduce((s, x) => s + x, 0);
+
+      // Reconstruct the engagement order from the within-drive timestamps.
+      const seq = buildSequence();
+      S.lastSeq = seq;
+
+      // *** CLASSIFY THIS STROKE EXACTLY ONCE -> the stable verdict. ***
+      const minKneeDeg = isFiniteNum(S.minKneeThisDrive) ? S.minKneeThisDrive : S.kneeSm;
+      const v = classifyStroke({ ratio, minKneeDeg, backEarly: S.backOpenFault, seq });
+      S.verdict = v;
+      pushCapped(S.verdicts, v.level, CFG.TREND_MAX);
+
+      // Emit telemetry (in-memory log + stream stub). Numbers only, rounded.
+      emitStroke({
+        stroke:    S.strokeCount,
+        t:         Math.round(sample.t),
+        spm:       round(60 / period),
+        period:    round(period, 2),
+        driveS:    round(driveT, 2),
+        recoveryS: round(recovT, 2),
+        ratio:     round(ratio, 2),
+        catchLean: round(catchLean, 1),
+        minKnee:   round(minKneeDeg, 1),
+        strokeLen: round(len, 3),
+        backEarly: !!S.backOpenFault,
+        seqOrder:  seq.order,
+        offender:  seq.offender,
+        side:      S.chosenSide,
+        verdict:   v.level,
+        headline:  v.headline,
+      });
     }
   }
   // Begin a new drive at this catch.
@@ -735,6 +1052,10 @@ function onCatch(sample) {
   S.catchKneeNorm = isFiniteNum(sample.kneeNorm) ? sample.kneeNorm : S.kneeNormSm;
   S.catchLean = isFiniteNum(sample.lean) ? sample.lean : S.leanSm;
   S.backOpenFault = false;            // reset the per-drive latch
+  // Reset within-drive sequencing capture for the new drive.
+  S.tLegsGo = null; S.tBodyGo = null; S.tArmsGo = null;
+  S.armCloseCatch = NaN;              // re-capture arm extension at this catch
+  S.minKneeThisDrive = isFiniteNum(S.kneeSm) ? S.kneeSm : NaN;
 }
 
 /** FINISH detected -> recovery begins. */
@@ -744,7 +1065,7 @@ function onFinish(sample) {
   S.recoveryStart = sample.t;
 }
 
-function pushCapped(arr, v) { arr.push(v); if (arr.length > CFG.HISTORY) arr.shift(); }
+function pushCapped(arr, v, cap = CFG.HISTORY) { arr.push(v); if (arr.length > cap) arr.shift(); }
 
 // ===========================================================================
 //  *** PRIORITY FAULT: EARLY BACK-OPENING ***  (the coach-grade insight)
@@ -767,10 +1088,12 @@ function pushCapped(arr, v) { arr.push(v); if (arr.length > CFG.HISTORY) arr.shi
 //  i.e. meaningful body swing happened while the legs were still < 60% done.
 //
 //  Latched per drive (S.backOpenFault) so one detection flags the whole stroke
-//  and drives both the live cue and the per-stroke fault rate.
+//  and drives both the per-stroke verdict and the per-stroke fault rate.
 // ===========================================================================
 function detectDriveFault(t, leanSigned, kneeNorm) {
-  if (S.phase !== "drive") return;
+  // Always clear the live diagnostics when not in a drive so the debug panel
+  // doesn't show stale values during recovery.
+  if (S.phase !== "drive") { S.liveLegProgress = NaN; S.liveBackOpening = NaN; return; }
   if (!isFiniteNum(S.catchKneeNorm) || !isFiniteNum(S.catchLean)) return;
   if (!isFiniteNum(leanSigned) || !isFiniteNum(kneeNorm)) return;
 
@@ -783,10 +1106,70 @@ function detectDriveFault(t, leanSigned, kneeNorm) {
   // Lean is +forward / -layback, so a DROP in lean = opening toward layback.
   const backOpening = S.catchLean - leanSigned;   // positive = opening up
 
+  // Expose for the debug panel (live diagnostics feeding the fault test).
+  S.liveLegProgress = legProgress;
+  S.liveBackOpening = backOpening;
+
   // The actual fault test: body swung open early while legs still lagging.
   if (backOpening > CFG.BACK_OPEN_LEAN_DELTA && legProgress < CFG.LEG_DONE_FRAC) {
     S.backOpenFault = true;       // latch for this drive
   }
+}
+
+// ===========================================================================
+//  SEQUENCING CAPTURE  (for the LEGS -> BODY -> ARMS strip)
+//  --------------------------------------------------------------------------
+//  During each drive we record the FIRST time each of legs / body / arms is
+//  seen to engage, against a small deadband threshold. The order those
+//  timestamps fire in IS the engagement order we show after the stroke.
+//   - legs engage:  legProgress passes LEGS_GO_FRAC
+//   - body engages: back opens past BODY_GO_DELTA degrees from the catch
+//   - arms engage:  wrist->shoulder closeness drops past ARMS_GO_DELTA
+//  Correct order = legs, then body, then arms. If body fires before legs
+//  reach LEG_DONE_FRAC, the body is the offender ("too early").
+// ===========================================================================
+function updateSequencing(t, leanSigned, kneeNorm, armClose) {
+  if (S.phase !== "drive") return;
+
+  // Track the most-compressed knee this drive (for the per-stroke "min knee").
+  if (isFiniteNum(S.kneeSm)) {
+    S.minKneeThisDrive = isFiniteNum(S.minKneeThisDrive) ? Math.min(S.minKneeThisDrive, S.kneeSm) : S.kneeSm;
+  }
+
+  if (!isFiniteNum(S.catchKneeNorm) || !isFiniteNum(S.catchLean)) return;
+
+  const legRange = Math.max(0.0001, 1 - S.catchKneeNorm);
+  const legProgress = isFiniteNum(kneeNorm) ? clamp((kneeNorm - S.catchKneeNorm) / legRange, 0, 1) : NaN;
+  const backOpening = isFiniteNum(leanSigned) ? (S.catchLean - leanSigned) : NaN;
+
+  if (S.tLegsGo == null && isFiniteNum(legProgress) && legProgress > CFG.LEGS_GO_FRAC) S.tLegsGo = t;
+  if (S.tBodyGo == null && isFiniteNum(backOpening) && backOpening > CFG.BODY_GO_DELTA) S.tBodyGo = t;
+  // Arms: closeness dropping below (catch closeness - delta). We compare to the
+  // running smoothed value; a meaningful drop from extension means the draw.
+  if (S.tArmsGo == null && isFiniteNum(armClose) && isFiniteNum(S.armCloseCatch)
+      && armClose < S.armCloseCatch - CFG.ARMS_GO_DELTA) S.tArmsGo = t;
+}
+
+/** Reconstruct the engagement order + offender from the within-drive times. */
+function buildSequence() {
+  // Build (name,t) pairs for whichever segments actually fired.
+  const items = [];
+  if (S.tLegsGo != null) items.push(["legs", S.tLegsGo]);
+  if (S.tBodyGo != null) items.push(["body", S.tBodyGo]);
+  if (S.tArmsGo != null) items.push(["arms", S.tArmsGo]);
+  items.sort((p, q) => p[1] - q[1]);
+  const order = items.map((p) => p[0]);
+
+  // Offender = body if it engaged before legs, or if the early-back fault tripped.
+  let offender = null;
+  const li = order.indexOf("legs");
+  const bi = order.indexOf("body");
+  if (S.backOpenFault) offender = "body";
+  else if (bi !== -1 && (li === -1 || bi < li)) offender = "body";
+
+  // legsFirst: was the very first thing to move the legs? (the desired start)
+  const legsFirst = order.length > 0 && order[0] === "legs";
+  return { order, offender, legsFirst };
 }
 
 // ===========================================================================
@@ -811,64 +1194,73 @@ function consistencyScore() {
 }
 
 // ===========================================================================
-//  COACHING CUE SELECTION  (exactly ONE, by priority)
-//  Priority:  early back-opening  >  rushed recovery  >  over-compression
-//             >  positive "sequence looks strong"
-//  Cues are sticky for ~1.4 s so the panel doesn't flicker between frames.
+//  PER-STROKE VERDICT  (computed ONCE per completed stroke -> no strobing)
+//  --------------------------------------------------------------------------
+//  Returns { level: 'good'|'warn'|'bad', headline, detail } for the stroke
+//  that just finished. Persistence rules ("don't cry wolf"):
+//   - RED ('bad')  only when the SAME fault recurs in >= BAD_RECUR_MIN of the
+//                  last 5 strokes. Today the recurring fault we track is the
+//                  early back-opening.
+//   - AMBER ('warn') for a ONE-OFF issue this stroke: a single early back-open,
+//                  a rushed recovery (ratio too high), or over-compression.
+//   - GREEN ('good') when the stroke is clean.
+//  Priority within a stroke: repeated back-open > one-off back-open >
+//  rushed recovery > over-compression > clean.
 // ===========================================================================
-function setCue(level, text, sub, t, holdMs = 1400) {
-  // Don't override a still-valid higher/equal cue with a transient lower one.
-  if (t < S.cue.until && priority(S.cue.level) > priority(level)) return;
-  S.cue = { level, text, sub, until: t + holdMs };
-}
-function priority(level) {
-  return level === "bad" ? 3 : level === "warn" ? 2 : level === "good" ? 1 : 0;
-}
+function classifyStroke({ ratio, minKneeDeg, backEarly, seq }) {
+  const recurCount = S.faultStrokes;                 // back-opens in last 5 (incl. this one)
+  const recurWindow = S.recentFaults.length;
 
-function chooseCue(t) {
-  const haveStrokes = S.strokeCount >= 1;
-  const ratio = S.driveRatios.length ? mean(S.driveRatios) : NaN;
-
-  // 1) PRIORITY: early back-opening -- live during the faulting drive, and
-  //    sticky for a stroke or two if it keeps recurring.
-  if (S.backOpenFault) {
-    setCue("bad", "Back opening too early",
-      "Drive with the legs first — keep your back angle set, then swing open.", t, 1600);
-    return;
-  }
-  if (haveStrokes && S.faultStrokes >= 2) {
-    setCue("bad", "Sequence: legs, then back",
-      `Early back-swing on ${S.faultStrokes} of your last ${S.recentFaults.length} strokes.`, t, 1500);
-    return;
+  // 1) RED -- the same fault is recurring. This is the only path to red.
+  if (recurCount >= CFG.BAD_RECUR_MIN) {
+    return {
+      level: "bad",
+      headline: "Back opening early",
+      detail: `Legs-then-back broke on ${recurCount} of your last ${recurWindow}. Drive the legs flat first, hold the back, then swing.`,
+    };
   }
 
-  // 2) Rushed recovery -- drive:recovery should be roughly 1:2 (ratio < 1.5
-  //    means the recovery is too quick relative to the drive).
-  if (isFiniteNum(ratio) && ratio > 1.5) {
-    setCue("warn", "Slow the recovery down",
-      `Drive:recovery is about ${ratio.toFixed(1)}:1 — aim nearer 1:2. Control the slide back.`, t);
-    return;
+  // 2) AMBER -- a one-off early back-open this stroke (not yet a pattern).
+  if (backEarly) {
+    return {
+      level: "warn",
+      headline: "Back opened a touch early",
+      detail: "One stroke — keep the back angle set and let the legs lead. Fine if it doesn't repeat.",
+    };
   }
 
-  // 3) Over-compression at the catch -- knee closed too far (shin past vertical).
-  if (isFiniteNum(S.kneeSm) && S.kneeSm < 55 && S.phase !== "recovery") {
-    setCue("warn", "Easing the over-compression",
-      "Shins are past vertical at the catch — ease the slide forward so the knee stays ~90°.", t);
-    return;
+  // 3) AMBER -- recovery too rushed (drive:recovery should be ~1:2, so ratio<1).
+  if (isFiniteNum(ratio) && ratio > CFG.RATIO_WARN) {
+    return {
+      level: "warn",
+      headline: "Recovery a bit quick",
+      detail: `Drive:recovery ~${ratio.toFixed(1)}:1 — aim nearer 1:2. Control the slide forward.`,
+    };
   }
 
-  // 4) Otherwise: positive reinforcement (only once we actually have strokes).
-  if (haveStrokes) {
-    setCue("good", "Sequence looks strong", "Legs-back-arms order is holding. Keep it smooth.", t, 1200);
-  } else {
-    setCue("idle", "Start rowing", "Take a few strokes and I'll read your sequencing.", "", 400);
+  // 4) AMBER -- over-compression at the catch (knee closed past ~vertical shin).
+  if (isFiniteNum(minKneeDeg) && minKneeDeg < CFG.COMPRESS_WARN_KNEE) {
+    return {
+      level: "warn",
+      headline: "Over-compressed at the catch",
+      detail: `Knee closed to ${Math.round(minKneeDeg)}° — ease the slide forward so the shins stay ~vertical.`,
+    };
   }
+
+  // 5) GREEN -- clean stroke. Vary the line a touch so it doesn't feel canned.
+  return {
+    level: "good",
+    headline: seq.legsFirst ? "Good sequence" : "Clean stroke",
+    detail: "Legs-back-arms order held. Keep it smooth and repeat.",
+  };
 }
 
 // ===========================================================================
 //  RENDER: skeleton overlay
 //  Mirrors are handled in CSS (canvas is transformed with the video), so we
-//  draw in raw normalised->pixel coords here.
+//  draw in raw normalised->pixel coords here. The trunk segment turns amber
+//  while the early-back-opening fault is live (a per-frame cue is FINE on the
+//  skeleton itself -- it's the big verdict that must stay stable).
 // ===========================================================================
 function drawSkeleton(lm, side, faulting) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -887,7 +1279,7 @@ function drawSkeleton(lm, side, faulting) {
   }
 
   // Highlight the TRUNK segment (shoulder->hip) of the chosen side. Amber when
-  // the early-back-opening fault is active -- the headline visual feedback.
+  // the early-back-opening fault is active -- a live skeleton hint.
   const sh = side === "right" ? lm[LM.R_SHOULDER] : lm[LM.L_SHOULDER];
   const hip = side === "right" ? lm[LM.R_HIP] : lm[LM.L_HIP];
   if (sh && hip) {
@@ -911,21 +1303,114 @@ function drawSkeleton(lm, side, faulting) {
 }
 
 // ===========================================================================
-//  RENDER: metric cards + cue
+//  RENDER: verdict, sequencing strip, trend dots, metrics, debug
 // ===========================================================================
+
+/** Apply the stable per-stroke verdict to both the panel cue and the big HUD
+ *  cue. Called from renderUI -- the values themselves only change when a new
+ *  stroke completes, so this paints the SAME thing every frame between strokes
+ *  (no strobing). */
+function renderVerdict() {
+  const v = S.verdict || { level: "idle", headline: "…", detail: "" };
+  // Panel cue.
+  el.cue.className = "cue " + (v.level || "idle");
+  el.cueText.textContent = v.headline || "…";
+  el.cueSub.textContent = v.detail || "";
+  // Big HUD verdict: headline text node + a "sub" span with the detail line.
+  // Rebuilt each paint (cheap; only the verdict object changes per stroke).
+  el.hudCue.className = "hud-cue " + (v.level || "idle");
+  el.hudCue.textContent = v.headline || "…";
+  const sub = document.createElement("span");
+  sub.className = "sub";
+  sub.textContent = v.detail || "";
+  el.hudCue.appendChild(sub);
+}
+
+/** Paint the LEGS -> BODY -> ARMS sequencing strip from the last stroke. */
+function renderSequencing() {
+  const seq = S.lastSeq;
+  const setSeg = (segEl, ordEl, name) => {
+    segEl.className = "seg";          // reset
+    if (!seq) { ordEl.textContent = ""; return; }
+    const pos = seq.order.indexOf(name);
+    // Order label: 1st / 2nd / 3rd, or a dash if it never clearly engaged.
+    ordEl.textContent = pos === -1 ? "–" : (pos === 0 ? "1st" : pos === 1 ? "2nd" : "3rd");
+    if (seq.offender === name) {
+      // The offending segment: red if the stroke verdict is bad, amber otherwise.
+      segEl.classList.add(S.verdict && S.verdict.level === "bad" ? "bad" : "warn");
+      ordEl.textContent = "too early";
+    } else if (pos !== -1) {
+      segEl.classList.add("ok");
+    }
+  };
+  setSeg(el.segLegs, el.ordLegs, "legs");
+  setSeg(el.segBody, el.ordBody, "body");
+  setSeg(el.segArms, el.ordArms, "arms");
+}
+
+/** Paint the trend dots (last verdicts, oldest -> newest, right-aligned). */
+function renderTrend() {
+  const dots = el.trend.querySelectorAll(".tdot");
+  const recent = S.verdicts.slice(-dots.length);
+  // Right-align: pad the front with blanks so the newest is on the right.
+  const pad = dots.length - recent.length;
+  dots.forEach((d, i) => {
+    const idx = i - pad;
+    const lvl = idx >= 0 ? recent[idx] : null;
+    d.className = "tdot" + (lvl ? " " + lvl : "");
+  });
+}
+
+/** Paint the live debug values + the per-stroke log table. */
+function renderDebug() {
+  // Only do the (cheap) work if the panel is open.
+  if (!el.debug.open) return;
+  const s = getLiveSnapshot();
+  el.dvSide.textContent = s.side || "–";
+  el.dvPhase.textContent = s.phase || "–";
+  el.dvVis.textContent = s.visOk ? "yes" : "no";
+  el.dvLean.textContent = s.leanDeg == null ? "–" : s.leanDeg + "°";
+  el.dvKnee.textContent = s.kneeDeg == null ? "–" : s.kneeDeg + "°";
+  el.dvLegExt.textContent = s.legExtension == null ? "–" : s.legExtension;
+  el.dvLegProg.textContent = s.legProgress == null ? "–" : s.legProgress;
+  el.dvBackOpen.textContent = s.backOpeningDeg == null ? "–" : s.backOpeningDeg + "°";
+  el.dvFault.textContent = s.faultLive ? "YES" : "no";
+  el.dvFault.style.color = s.faultLive ? "var(--warn)" : "var(--muted)";
+
+  // Per-stroke log table (newest first).
+  const rows = S.strokeLog.slice().reverse();
+  if (!rows.length) {
+    el.logBody.innerHTML = '<tr><td colspan="9" class="log-empty">No strokes logged yet — start rowing.</td></tr>';
+    return;
+  }
+  const cell = (v, suffix = "") => (v == null ? "–" : v + suffix);
+  el.logBody.innerHTML = rows.map((r) => `
+    <tr class="v-${r.verdict}">
+      <td>${r.stroke}</td>
+      <td>${cell(r.spm)}</td>
+      <td>${cell(r.driveS)}</td>
+      <td>${cell(r.recoveryS)}</td>
+      <td>${r.ratio == null ? "–" : r.ratio + ":1"}</td>
+      <td>${cell(r.catchLean, "°")}</td>
+      <td>${cell(r.minKnee, "°")}</td>
+      <td class="${r.backEarly ? "yes" : "no"}">${r.backEarly ? "Y" : "N"}</td>
+      <td class="verdict">${r.verdict}</td>
+    </tr>`).join("");
+}
+
 function renderUI() {
   // Phase pill.
   el.phase.textContent = S.phase === "idle" ? "–" : S.phase.toUpperCase();
   el.phase.className = "phase-pill" + (S.phase === "drive" ? " drive" : S.phase === "recovery" ? " recovery" : "");
   el.strokes.textContent = String(S.strokeCount);
 
-  // Live metrics (rounded; show "--" when unknown).
+  // Live metrics (rounded; show "–" when unknown). SPM + phase may update live.
   const spm = S.periods.length ? 60 / mean(S.periods) : NaN;
-  el.spm.textContent   = isFiniteNum(spm) ? String(round(spm)) : "–";
+  el.spm.textContent   = rOr(spm);
   const ratio = S.driveRatios.length ? mean(S.driveRatios) : NaN;
   el.ratio.textContent = isFiniteNum(ratio) ? `${round(ratio, 1)} : 1` : "–";
-  el.lean.textContent  = isFiniteNum(S.leanSm) ? String(round(S.leanSm)) : "–";
-  el.knee.textContent  = isFiniteNum(S.kneeSm) ? String(round(S.kneeSm)) : "–";
+  el.lean.textContent  = rOr(S.leanSm);
+  el.knee.textContent  = rOr(S.kneeSm);
 
   const c = consistencyScore();
   if (c == null) {
@@ -937,17 +1422,17 @@ function renderUI() {
     el.bar.style.background = c >= 70 ? "var(--good)" : c >= 45 ? "var(--warn)" : "var(--bad)";
   }
 
-  // The single cue.
-  el.cue.className = "cue " + (S.cue.level || "idle");
-  el.cueText.textContent = S.cue.text || "…";
-  el.cueSub.textContent = S.cue.sub || "";
+  // The STABLE per-stroke verdict (panel + HUD).
+  renderVerdict();
+  renderSequencing();
+  renderTrend();
 
-  // Glanceable HUD overlaid on the video (readable from rowing distance).
-  el.hudSpm.textContent = isFiniteNum(spm) ? String(round(spm)) : "–";
+  // HUD live bits (SPM + phase only -- these don't strobe annoyingly).
+  el.hudSpm.textContent = rOr(spm);
   el.hudPhase.textContent = S.phase === "idle" ? "READY" : S.phase.toUpperCase();
-  el.hudCue.textContent = S.cue.text || "…";
-  el.hudCue.className = "hud-cue " + (S.cue.level || "idle");
-  stage.classList.toggle("fault", S.backOpenFault && S.phase === "drive");
+  el.hudPhase.className = "hud-phase" + (S.phase === "drive" ? " drive" : S.phase === "recovery" ? " recovery" : "");
+
+  renderDebug();
 }
 
 // ===========================================================================
@@ -971,10 +1456,13 @@ function loop() {
     if (poses && poses.length) {
       processPose(poses[0], t);     // numbers only out of this; frame not kept
     } else {
-      // No person detected -> nudge to reposition.
+      // No person detected -> nudge to reposition (this updates the SETUP state,
+      // NOT the stroke verdict, so a clean verdict stays put while you settle in).
       S.visOk = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      setCue("idle", "Reposition", "Stand side-on with your full body in frame.", t, 300);
+      if (S.strokeCount === 0) {
+        S.verdict = { level: "idle", headline: "Reposition", detail: "Stand side-on with your full body in frame." };
+      }
     }
     renderUI();
   }
@@ -990,10 +1478,14 @@ function processPose(lm, t) {
   const j = sideJoints(lm, side);
   S.visOk = j.ok;
 
-  // Poor visibility -> guide the user, don't compute garbage.
+  // Poor visibility -> guide the user, don't compute garbage. Only override the
+  // verdict with a setup prompt before the first stroke (so a real verdict isn't
+  // clobbered by a momentary tracking dropout mid-session).
   if (!j.ok) {
     drawSkeleton(lm, side, false);
-    setCue("idle", "Reposition", "Stand side-on, full body in frame, with good light.", t, 300);
+    if (S.strokeCount === 0) {
+      S.verdict = { level: "idle", headline: "Reposition", detail: "Stand side-on, full body in frame, with good light." };
+    }
     return;
   }
 
@@ -1008,19 +1500,29 @@ function processPose(lm, t) {
   const leanRaw = trunkLean(j, feetX);
   const kneeRaw = kneeAngle(j);
   const kneeNorm = legExtension(kneeRaw);
+  const armClose = armCloseness(j);
 
-  // Smooth lean + knee for display and for the fault logic.
+  // Smooth lean + knee + arm-draw for display and for the fault / sequencing logic.
   S.leanSm = ema(S.leanSm, leanRaw, CFG.EMA_FAST);
   S.kneeSm = ema(S.kneeSm, kneeRaw, CFG.EMA_FAST);
+  S.armCloseSm = ema(S.armCloseSm, armClose, CFG.EMA_FAST);
+
+  // Capture the arm extension at the catch (first frame of a fresh drive where
+  // we haven't yet recorded it) so the arm-draw onset is measured against it.
+  if (S.phase === "drive" && S.tArmsGo == null && !isFiniteNum(S.armCloseCatch)) {
+    S.armCloseCatch = S.armCloseSm;
+  }
 
   // Stroke segmentation (uses its own smoothed compression + kneeNorm signals).
+  // NB: onCatch() inside here finalises + CLASSIFIES the previous stroke once.
   updateSegmentation(t, j, feetX, S.leanSm, kneeNorm);
 
-  // Priority fault check -- runs during the drive, against the catch baselines.
+  // Priority fault check + sequencing capture -- both run during the drive,
+  // against the catch baselines.
   detectDriveFault(t, S.leanSm, S.kneeNormSm);
+  updateSequencing(t, S.leanSm, S.kneeNormSm, S.armCloseSm);
 
-  // Decide the one cue, then draw (trunk amber if faulting right now).
-  chooseCue(t);
+  // Draw the skeleton (trunk amber if the fault is live right now).
   drawSkeleton(lm, side, S.backOpenFault && S.phase === "drive");
 }
 
@@ -1044,6 +1546,8 @@ async function start() {
   startBtn.classList.add("stop");
   flipBtn.disabled = false;
   cameraBtn.disabled = false;
+  // Fresh verdict at session start.
+  S.verdict = { level: "idle", headline: "Start rowing", detail: "Take a few strokes and I'll read your sequencing." };
   lastVideoTime = -1;
   requestAnimationFrame(loop);
 }
@@ -1066,12 +1570,15 @@ function stop() {
 // Reset all derived per-session numbers (e.g. when switching camera/side).
 function resetMetrics() {
   Object.assign(S, {
-    leanSm: NaN, kneeSm: NaN, hipXSm: NaN, kneeNormSm: NaN,
+    leanSm: NaN, kneeSm: NaN, hipXSm: NaN, kneeNormSm: NaN, armCloseSm: NaN, armCloseCatch: NaN,
+    liveLegProgress: NaN, liveBackOpening: NaN,
     signalBuf: [], phase: "idle",
-    lastCatch: null, lastFinish: null, driveStart: null, recoveryStart: null, lastStrokeT: null,
+    lastCatch: null, lastFinish: null, driveStart: null, recoveryStart: null,
+    tLegsGo: null, tBodyGo: null, tArmsGo: null, minKneeThisDrive: NaN,
     strokeCount: 0, periods: [], driveRatios: [], strokeLengths: [], catchAngles: [],
     catchKneeNorm: NaN, catchLean: NaN, backOpenFault: false, faultStrokes: 0, recentFaults: [],
-    cue: { level: "idle", text: "", sub: "", until: 0 },
+    verdict: { level: "idle", headline: "Start rowing", detail: "Take a few strokes and I'll read your sequencing." },
+    verdicts: [], lastSeq: null, strokeLog: [],
   });
   lastVideoTime = -1;
 }
@@ -1093,6 +1600,38 @@ cameraBtn.addEventListener("click", async () => {
   S.facingMode = (S.facingMode === "user") ? "environment" : "user";
   resetMetrics();
   try { await startCamera(); } catch { /* overlay handles it */ }
+});
+
+// Feedback-first <-> show-video toggle. Default = dimmed (feedback-forward).
+videoToggleBtn.addEventListener("click", () => {
+  const dim = stage.classList.toggle("dimvideo");
+  videoToggleBtn.textContent = dim ? "Show video" : "Dim video";
+});
+
+// "Copy log" -- copies the per-stroke log as JSON so Dan can paste it back.
+el.copyLogBtn.addEventListener("click", async () => {
+  const payload = JSON.stringify(S.strokeLog, null, 2);
+  let ok = false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(payload);
+      ok = true;
+    }
+  } catch (_) { ok = false; }
+  if (!ok) {
+    // Fallback for non-secure contexts / older browsers.
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = payload; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch (_) { ok = false; }
+  }
+  el.copyNote.textContent = ok
+    ? `Copied ${S.strokeLog.length} stroke${S.strokeLog.length === 1 ? "" : "s"} as JSON.`
+    : "Couldn't copy automatically — open the console; the log is logged there.";
+  if (!ok) console.log("Per-stroke log:", payload);
 });
 
 // Pause inference when the tab is hidden (saves battery; no frames processed).
