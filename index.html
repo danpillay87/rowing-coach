@@ -150,6 +150,13 @@
     font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
   }
   .hud-spm small { font-size: clamp(9px, 2.2vw, 12px); color: var(--muted); letter-spacing: .18em; text-transform: uppercase; }
+  /* v3: the closeness-to-best "match best %" chip (centre of the top row). */
+  .hud-match { padding: 6px 14px; text-align: center; }
+  .hud-match b {
+    display: block; font-size: clamp(18px, 5vw, 30px); font-weight: 800; line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--aqua-2);
+  }
+  .hud-match small { font-size: clamp(8px, 1.9vw, 10.5px); color: var(--muted); letter-spacing: .14em; text-transform: uppercase; }
   .hud-phase {
     font-size: clamp(11px, 2.8vw, 16px); font-weight: 800; padding: 8px 14px; border-radius: 999px;
     align-self: flex-start; letter-spacing: .10em; text-transform: uppercase; color: var(--muted);
@@ -327,6 +334,13 @@
   .metric .v.delta-down { color: var(--amber); }
   .metric .u { font-size: 12.5px; color: var(--muted); font-weight: 500; }
   .metric.span2 { grid-column: 1 / -1; }
+  /* v3: reference-source tag in the "Match to your best" metric label. */
+  .ref-tag {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted-2); background: rgba(255,255,255,.05); border: 1px solid var(--line-soft);
+    border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: middle;
+  }
+  .ref-tag.has-ref { color: var(--aqua); background: rgba(24,224,200,.10); border-color: rgba(24,224,200,.28); }
 
   /* Consistency bar. */
   .bar { height: 7px; border-radius: 6px; background: rgba(255,255,255,.07); margin-top: 9px; overflow: hidden; }
@@ -380,6 +394,14 @@
   }
   button.primary.stop { background: linear-gradient(100deg, #ff8a8a, var(--red)); color: #350707; box-shadow: 0 8px 24px rgba(255,107,107,.22); }
   button.ghost { flex: 0 0 auto; font-size: 13px; padding: 10px 14px; min-height: 42px; font-weight: 650; }
+  /* v3: an "active" toggle state (Tron view on, ghost on, replaying). */
+  button.active {
+    border-color: rgba(24,224,200,.55); color: var(--aqua);
+    background: rgba(24,224,200,.10);
+    box-shadow: inset 0 0 0 1px rgba(24,224,200,.25);
+  }
+  /* The kinetic-loop control row sits just under the primary controls. */
+  .controls-kinetic { margin-top: 10px; }
 
   .hint { color: var(--muted); font-size: 12.5px; margin-top: 13px; line-height: 1.5; }
   .hint code { background: var(--panel-2); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
@@ -455,9 +477,14 @@
         <div class="scrim"></div>
 
         <div class="hud" id="hud">
-          <!-- Top: stroke rate + live phase -->
+          <!-- Top: stroke rate + match-to-best + live phase -->
           <div class="hud-top">
             <div class="hud-spm glass"><b id="hudSpm">&ndash;</b><small>spm</small></div>
+            <!-- v3 closeness-to-best ("match %") -- the goal-directed improvement read.
+                 Hidden until a reference + a score exist. -->
+            <div class="hud-match glass" id="hudMatch" style="display:none;">
+              <b id="hudMatchVal">&ndash;</b><small>match best</small>
+            </div>
             <div class="hud-phase glass" id="hudPhase"><span class="pdot"></span>READY</div>
           </div>
 
@@ -518,6 +545,14 @@
         <button id="videoToggleBtn" class="ghost" title="Show or dim the camera feed">Show video</button>
       </div>
 
+      <!-- v3: the kinetic improvement loop controls (capture / replay / ghost / view) -->
+      <div class="controls controls-kinetic">
+        <button id="saveStrokeBtn" class="ghost" disabled title="Pin the last stroke as your reference to beat">Save stroke</button>
+        <button id="replayBtn" class="ghost" disabled title="Replay your best stroke as a Tron cartoon">Replay best</button>
+        <button id="ghostBtn" class="ghost" title="Overlay your best stroke as a ghost to optimise against">Ghost: ON</button>
+        <button id="viewBtn" class="ghost" title="Switch between the neon figure and the raw skeleton">View: Tron</button>
+      </div>
+
       <p class="hint">
         Tip: prop your phone or laptop side-on, ~2&ndash;3&nbsp;m away, so the camera sees your
         whole body from the side (head to feet). On Start it spends about a dozen strokes
@@ -558,6 +593,12 @@
             <div class="k">Consistency vs your baseline (last 5)</div>
             <div class="v"><span id="mConsist">&ndash;</span><span class="u">%</span></div>
             <div class="bar"><i id="consistBar"></i></div>
+          </div>
+          <!-- v3: closeness-to-best (trajectory match %). Goal-directed signal. -->
+          <div class="metric span2">
+            <div class="k">Match to your best stroke <span id="refTag" class="ref-tag">no reference yet</span></div>
+            <div class="v"><span id="mMatch">&ndash;</span><span class="u">%</span></div>
+            <div class="bar"><i id="matchBar"></i></div>
           </div>
           <div class="metric span2">
             <div class="k">Phase &middot; total strokes</div>
@@ -608,7 +649,8 @@
 
         <div class="prog-actions">
           <button id="clearHistBtn" class="ghost">Clear history</button>
-          <span class="prog-note" id="histNote">Stores per-session summaries (numbers only) locally on this device.</span>
+          <button id="clearRefBtn" class="ghost">Clear best stroke</button>
+          <span class="prog-note" id="histNote">Stores per-session summaries + your best-stroke shape (numbers only) locally on this device. No video, ever.</span>
         </div>
       </div>
 
@@ -641,6 +683,19 @@
             <div class="lv"><span class="lk">legProgress</span><span class="lvv" id="dvLegProg">&ndash;</span></div>
             <div class="lv"><span class="lk">backOpening&deg;</span><span class="lvv" id="dvBackOpen">&ndash;</span></div>
             <div class="lv"><span class="lk">phase / state</span><span class="lvv" id="dvState">&ndash;</span></div>
+            <div class="lv"><span class="lk">match best %</span><span class="lvv" id="dvMatch">&ndash;</span></div>
+            <div class="lv"><span class="lk">last match %</span><span class="lvv" id="dvLastMatch">&ndash;</span></div>
+            <div class="lv"><span class="lk">capture frames</span><span class="lvv" id="dvFrames">&ndash;</span></div>
+          </div>
+
+          <h4>Reference (your best stroke)</h4>
+          <div class="live" id="refLive">
+            <div class="lv"><span class="lk">Source</span><span class="lvv" id="rvSource">&ndash;</span></div>
+            <div class="lv"><span class="lk">Ref score</span><span class="lvv" id="rvScore">&ndash;</span></div>
+            <div class="lv"><span class="lk">Ref spm</span><span class="lvv" id="rvSpm">&ndash;</span></div>
+            <div class="lv"><span class="lk">Ref side</span><span class="lvv" id="rvSide">&ndash;</span></div>
+            <div class="lv"><span class="lk">Traj steps</span><span class="lvv" id="rvN">&ndash;</span></div>
+            <div class="lv"><span class="lk">Drive frac</span><span class="lvv" id="rvDrive">&ndash;</span></div>
           </div>
 
           <h4>Learned baseline (your normal)</h4>
@@ -662,11 +717,11 @@
               <thead>
                 <tr>
                   <th>#</th><th>spm</th><th>drv s</th><th>rec s</th><th>ratio</th>
-                  <th>catch&deg;</th><th>min knee&deg;</th><th>dev &sigma;</th><th>score</th><th>flag</th><th>verdict</th>
+                  <th>catch&deg;</th><th>min knee&deg;</th><th>dev &sigma;</th><th>score</th><th>match%</th><th>flag</th><th>verdict</th>
                 </tr>
               </thead>
               <tbody id="logBody">
-                <tr><td colspan="11" class="log-empty">No strokes logged yet &mdash; start rowing.</td></tr>
+                <tr><td colspan="12" class="log-empty">No strokes logged yet &mdash; start rowing.</td></tr>
               </tbody>
             </table>
           </div>
@@ -737,6 +792,50 @@ const BONES = [
   [LM.R_HIP, LM.R_KNEE], [LM.R_KNEE, LM.R_ANKLE], [LM.R_ANKLE, LM.R_FOOT],
 ];
 
+/* ===========================================================================
+ *  v3 TRAJECTORY MODEL  (numbers only -- never any frame/image data)
+ *  --------------------------------------------------------------------------
+ *  A captured stroke is reduced to a compact, phase-normalised TRAJECTORY:
+ *  TRAJ_N timesteps, each holding the 6 key side-on joints as torso-relative
+ *  [x, y] pairs (origin = hip, scaled by a body reference length). Storing it
+ *  pose-NORMALISED (not raw screen coords) means the closeness metric compares
+ *  stroke SHAPE -- independent of where he sat in frame or how far the camera
+ *  was -- and the Tron replay/ghost always sits centred on the stage.
+ *
+ *  TRAJECTORY object shape (the v3 contract):
+ *    {
+ *      n:      number,        // timestep count (= TRAJ_N)
+ *      side:   "left"|"right",// which side was read
+ *      score:  number|null,   // form score of the stroke this came from
+ *      spm:    number|null,   // stroke rate of that stroke
+ *      driveFrac: number,     // fraction of the n steps that were the DRIVE
+ *                             //   (the rest are recovery) -- for phase shading
+ *      keys:   string[],      // joint order: ["ank","knee","hip","sho","elb","hand"]
+ *      pts:    number[][][],  // [n][6][2] torso-relative coords (hip at 0,0)
+ *      at:     number,        // Date.now() when captured (for "saved" labels)
+ *    }
+ *  The 6 joints we track for the side-on figure (ankle..hand). "hand" = wrist,
+ *  which is the rowing HANDLE -- rendered as the prominent node + bar-path. */
+const TRAJ_N = 40;                               // resample resolution per stroke
+const TRAJ_KEYS = ["ank", "knee", "hip", "sho", "elb", "hand"];
+/** Map a side -> the landmark indices for our 6 tracked joints, in TRAJ_KEYS order. */
+function sideTrajIdx(side) {
+  return side === "right"
+    ? [LM.R_ANKLE, LM.R_KNEE, LM.R_HIP, LM.R_SHOULDER, LM.R_ELBOW, LM.R_WRIST]
+    : [LM.L_ANKLE, LM.L_KNEE, LM.L_HIP, LM.L_SHOULDER, LM.L_ELBOW, LM.L_WRIST];
+}
+/* Index of each tracked joint within a trajectory frame (the 6-element array). */
+const TJ = { ANK: 0, KNEE: 1, HIP: 2, SHO: 3, ELB: 4, HAND: 5 };
+/* Bone pairs WITHIN a trajectory frame (indices into the 6 tracked joints).
+   This is the limb wiring the Tron figure draws for replay/ghost/live-canonical. */
+const TRAJ_BONES = [
+  [TJ.ANK, TJ.KNEE], [TJ.KNEE, TJ.HIP],     // shin, thigh
+  [TJ.HIP, TJ.SHO],                          // trunk
+  [TJ.SHO, TJ.ELB], [TJ.ELB, TJ.HAND],      // upper arm, forearm (to the handle)
+];
+/* The trunk bone's position in TRAJ_BONES (so we can flare it red on a back fault). */
+const TRUNK_BONE_INDEX = 2;
+
 // ---------------------------------------------------------------------------
 //  DOM handles
 // ---------------------------------------------------------------------------
@@ -753,6 +852,12 @@ const cameraBtn  = document.getElementById("cameraBtn");
 const videoToggleBtn = document.getElementById("videoToggleBtn");
 const clearHistBtn = document.getElementById("clearHistBtn");
 const stage      = document.getElementById("stage");
+// v3 kinetic-loop controls.
+const saveStrokeBtn = document.getElementById("saveStrokeBtn");
+const replayBtn  = document.getElementById("replayBtn");
+const ghostBtn   = document.getElementById("ghostBtn");
+const viewBtn    = document.getElementById("viewBtn");
+const clearRefBtn= document.getElementById("clearRefBtn");
 
 const el = {
   spm:      document.getElementById("mSpm"),
@@ -761,6 +866,9 @@ const el = {
   knee:     document.getElementById("mKnee"),
   consist:  document.getElementById("mConsist"),
   bar:      document.getElementById("consistBar"),
+  match:    document.getElementById("mMatch"),
+  matchBar: document.getElementById("matchBar"),
+  refTag:   document.getElementById("refTag"),
   strokes:  document.getElementById("mStrokes"),
   phase:    document.getElementById("phasePill"),
   cue:      document.getElementById("cue"),
@@ -769,6 +877,8 @@ const el = {
   coachPill:document.getElementById("coachPill"),
   // HUD hero
   hudSpm:   document.getElementById("hudSpm"),
+  hudMatch: document.getElementById("hudMatch"),
+  hudMatchVal: document.getElementById("hudMatchVal"),
   hudPhase: document.getElementById("hudPhase"),
   hudCue:   document.getElementById("hudCue"),
   hudCueSub:document.getElementById("hudCueSub"),
@@ -809,6 +919,16 @@ const el = {
   dvLegProg:document.getElementById("dvLegProg"),
   dvBackOpen:document.getElementById("dvBackOpen"),
   dvState:  document.getElementById("dvState"),
+  dvMatch:  document.getElementById("dvMatch"),
+  dvLastMatch: document.getElementById("dvLastMatch"),
+  dvFrames: document.getElementById("dvFrames"),
+  // Reference (debug)
+  rvSource: document.getElementById("rvSource"),
+  rvScore:  document.getElementById("rvScore"),
+  rvSpm:    document.getElementById("rvSpm"),
+  rvSide:   document.getElementById("rvSide"),
+  rvN:      document.getElementById("rvN"),
+  rvDrive:  document.getElementById("rvDrive"),
   // Baseline (debug)
   bvStatus: document.getElementById("bvStatus"),
   bvCatchLean: document.getElementById("bvCatchLean"),
@@ -887,6 +1007,139 @@ function robustSD(a, floor) {
   return Math.max(floor, isFiniteNum(sd) ? sd : 0);
 }
 
+// ===========================================================================
+//  v3 TRAJECTORY MATHS  (numbers only -- frames are never retained)
+//  --------------------------------------------------------------------------
+//  These turn a buffer of raw per-frame joint positions into a compact,
+//  pose-normalised, phase-resampled trajectory, and compare two trajectories.
+// ===========================================================================
+
+/** Canonicalise ONE frame of 6 joints (raw normalised [x,y]) into torso-relative
+ *  space: translate so the HIP sits at the origin, scale by a body reference
+ *  length (shoulder->hip, with an ankle->hip fallback) so the figure is the same
+ *  size regardless of camera distance. Returns 6×[x,y] or null if degenerate.
+ *  This is what makes closeness a measure of stroke SHAPE, not screen position. */
+function canonFrame(frame) {
+  if (!frame || frame.length < 6) return null;
+  const hip = frame[TJ.HIP], sho = frame[TJ.SHO], ank = frame[TJ.ANK];
+  if (!hip || !isFiniteNum(hip[0]) || !isFiniteNum(hip[1])) return null;
+  // Reference length: trunk (shoulder->hip); fall back to hip->ankle; then a const.
+  let ref = (sho && isFiniteNum(sho[0])) ? Math.hypot(sho[0] - hip[0], sho[1] - hip[1]) : NaN;
+  if (!isFiniteNum(ref) || ref < 1e-3) {
+    ref = (ank && isFiniteNum(ank[0])) ? Math.hypot(ank[0] - hip[0], ank[1] - hip[1]) : NaN;
+  }
+  if (!isFiniteNum(ref) || ref < 1e-3) ref = 0.25;     // last-resort scale
+  const out = new Array(6);
+  for (let k = 0; k < 6; k++) {
+    const p = frame[k];
+    out[k] = (p && isFiniteNum(p[0]) && isFiniteNum(p[1]))
+      ? [(p[0] - hip[0]) / ref, (p[1] - hip[1]) / ref]
+      : null;
+  }
+  return out;
+}
+
+/** Resample a list of frames to exactly N phase-normalised, canonicalised
+ *  timesteps via linear interpolation along the frame index. This removes tempo
+ *  from the comparison: a slow and a fast stroke of the same SHAPE map to the
+ *  same trajectory. Missing joints are carried/skipped gracefully.
+ *  Accepts EITHER the capture-buffer shape ({ t, j:[6×[x,y]] }) OR a bare
+ *  6-joint array per frame -- whichever the caller has. */
+function resampleFrames(frames, N) {
+  const canon = frames.map((f) => canonFrame(f && f.j ? f.j : f)).filter(Boolean);
+  if (canon.length < 2) return null;
+  const out = [];
+  for (let i = 0; i < N; i++) {
+    const f = (i / (N - 1)) * (canon.length - 1);   // fractional source index
+    const lo = Math.floor(f), hi = Math.min(canon.length - 1, lo + 1);
+    const a = f - lo;
+    const A = canon[lo], B = canon[hi];
+    const frame = new Array(6);
+    for (let k = 0; k < 6; k++) {
+      const pa = A[k], pb = B[k];
+      if (pa && pb) frame[k] = [pa[0] + (pb[0] - pa[0]) * a, pa[1] + (pb[1] - pa[1]) * a];
+      else frame[k] = pa || pb || null;
+    }
+    out.push(frame);
+  }
+  return out;
+}
+
+/** Build a finished TRAJECTORY object from the current stroke's frame buffer.
+ *  driveFrac = where the finish fell within the buffer (for phase shading on
+ *  the figure). Returns null if there wasn't enough usable data. */
+function buildTrajectory(frames, meta) {
+  const pts = resampleFrames(frames, TRAJ_N);
+  if (!pts) return null;
+  // driveFrac: position of the finish within the captured frames (0..1).
+  let driveFrac = 0.5;
+  if (meta && isFiniteNum(meta.finishT) && isFiniteNum(meta.startT) && frames.length) {
+    const span = frames[frames.length - 1].t - frames[0].t;
+    if (span > 1e-3) driveFrac = clamp((meta.finishT - frames[0].t) / span, 0.1, 0.9);
+  }
+  return {
+    n: TRAJ_N,
+    side: meta && meta.side ? meta.side : S.chosenSide,
+    score: meta && isFiniteNum(meta.score) ? Math.round(meta.score) : null,
+    spm: meta && isFiniteNum(meta.spm) ? Math.round(meta.spm) : null,
+    driveFrac: round(driveFrac, 2),
+    keys: TRAJ_KEYS.slice(),
+    pts,
+    at: Date.now(),
+  };
+}
+
+/** Per-joint canonical distance between two trajectories (same N), averaged over
+ *  timesteps -> a 6-element array of mean joint distances (canonical units).
+ *  Both are already hip-centred + scale-normalised, so this compares stroke SHAPE.
+ *  NB: we deliberately do NOT mirror on the left/right side label -- "side" is
+ *  only which set of limb landmarks we read, not which way the rower faces. At a
+ *  fixed machine the rower sets up the same way, so the canonical x-orientation
+ *  is consistent; mirroring would reflect an asymmetric pose and wreck the match. */
+function trajJointDistances(A, B) {
+  if (!A || !B || !A.pts || !B.pts) return null;
+  const n = Math.min(A.pts.length, B.pts.length);
+  if (n < 2) return null;
+  const sums = new Array(6).fill(0);
+  const counts = new Array(6).fill(0);
+  for (let i = 0; i < n; i++) {
+    const fa = A.pts[i], fb = B.pts[i];
+    if (!fa || !fb) continue;
+    for (let k = 0; k < 6; k++) {
+      const pa = fa[k], pb = fb[k];
+      if (!pa || !pb) continue;
+      const dx = pa[0] - pb[0];
+      const dy = pa[1] - pb[1];
+      sums[k] += Math.hypot(dx, dy);
+      counts[k]++;
+    }
+  }
+  return sums.map((s, k) => (counts[k] ? s / counts[k] : NaN));
+}
+
+/** Closeness "match %" 0..100 from two trajectories: mean normalised joint
+ *  distance mapped through a soft falloff so identical shape -> 100 and a wildly
+ *  different stroke -> near 0. Hands/shoulders are weighted a touch more (they
+ *  carry the rowing shape). Independent of the fault thresholds. */
+function trajCloseness(A, B) {
+  const d = trajJointDistances(A, B);
+  if (!d) return NaN;
+  // Per-joint weights (sum normalised below): handle + trunk carry the stroke.
+  const W = { ank: 0.8, knee: 1.0, hip: 0.6, sho: 1.1, elb: 1.0, hand: 1.4 };
+  const wArr = TRAJ_KEYS.map((k) => W[k]);
+  let num = 0, den = 0;
+  for (let k = 0; k < 6; k++) {
+    if (!isFiniteNum(d[k])) continue;
+    num += d[k] * wArr[k];
+    den += wArr[k];
+  }
+  if (den < 1e-6) return NaN;
+  const meanDist = num / den;                       // mean canonical distance
+  // Falloff: dist 0 -> 100%; ~0.35 canonical units -> ~50%; large -> ~0.
+  const match = 100 * Math.exp(-(meanDist * meanDist) / (2 * 0.30 * 0.30));
+  return clamp(match, 0, 100);
+}
+
 // ---------------------------------------------------------------------------
 //  Session state -- all derived NUMBERS, held in memory only, cleared on reload.
 //  No frames, no images, ever leave this object.
@@ -963,6 +1216,35 @@ const S = {
   baseline: null,           // learned baseline object (median + robustSD per metric) or null
   baselineSeed: null,       // baseline restored from localStorage at boot (for display before re-learn)
   sessionStart: 0,          // performance.now() at session start (for duration)
+
+  // ----- v3 TRAJECTORY CAPTURE / REFERENCE / GHOST -------------------------
+  // Per-stroke raw capture buffer (numbers only): one entry per processed frame
+  // during the CURRENT stroke. Each = { t, side, j:[6×[x,y]], phase }. Reset at
+  // every catch; resampled to a compact trajectory when the stroke completes.
+  strokeFrames: [],
+  curFrameJoints: null,     // the 6 tracked joints for the LATEST frame (screen-normalised [x,y])
+  curStrokeStartT: 0,       // performance.now() at the current stroke's catch
+  curFinishT: null,         // performance.now() of this stroke's finish (for driveFrac)
+  lastTraj: null,           // the most-recently-completed stroke's trajectory (for "Save stroke")
+
+  reference: null,          // session/best REFERENCE trajectory (the "your best" target)
+  refSource: "none",        // where the reference came from: "none"|"session-best"|"pinned"|"saved-best"
+  refBestScore: NaN,        // form score of the current session-best reference (so a better stroke replaces it)
+  refSeed: null,            // reference restored from localStorage at boot (carries across sessions)
+
+  // Closeness-to-best (trajectory similarity) -------------------------------
+  closeness: NaN,           // smoothed 0..100 "match %" of recent strokes vs the reference
+  lastCloseness: NaN,       // raw match % of the most recent completed stroke
+  closenessHistory: [],     // raw per-stroke match % this session (for the trend)
+  liveDivergence: null,     // per-joint live divergence 0..1 (drives the amber ghost flare)
+
+  // Tron / view ------------------------------------------------------------
+  viewMode: "tron",         // "tron" (neon figure, default hero) | "skeleton" (legacy overlay)
+  trail: [],                // short fading MOTION TRAIL: recent live frames (screen-space 6×[x,y])
+  barPath: [],              // recent HANDLE positions (screen-space [x,y]) for the bar-path trace
+  replaying: false,         // replay overlay active (loops the reference as a Tron cartoon)
+  ghostOn: true,            // ghost-compare overlay enabled (live vs reference)
+  reduceMotion: false,      // mirrors prefers-reduced-motion (trail/pulse trimmed)
 };
 
 // Tunables (documented inline where used).
@@ -1006,11 +1288,19 @@ const CFG = {
   LEGS_GO_FRAC: 0.12,       // legProgress past which we say the legs have "engaged"
   BODY_GO_DELTA: 4,         // deg of back-opening past which the body has "engaged"
   ARMS_GO_DELTA: 0.04,      // wrist->shoulder closeness drop that means arms have "engaged"
+
+  // ---- v3 trajectory / ghost / closeness ----
+  TRAIL_MAX: 9,             // frames in the fading motion trail (Tron figure)
+  BARPATH_MAX: 46,          // handle positions kept for the faint bar-path trace
+  CLOSE_EMA: 0.4,           // smoothing applied to the displayed closeness/match %
+  DIVERGE_FLARE: 0.16,      // per-joint canonical distance above which the ghost flares amber
+  GHOST_MIN_FRAMES: 6,      // min frames captured this stroke before we attempt a live ghost align
 };
 
 // localStorage keys (NUMBERS ONLY ever written here).
 const LS_BASELINE = "rowingCoach.baseline.v2";
 const LS_HISTORY  = "rowingCoach.history.v2";
+const LS_REFERENCE = "rowingCoach.reference.v3";  // best REFERENCE trajectory (numbers only)
 const HISTORY_MAX = 60;     // sessions kept locally
 
 // ===========================================================================
@@ -1046,9 +1336,12 @@ const HISTORY_MAX = 60;     // sessions kept locally
 //      verdict:   string,   // "good" | "warn" | "bad" | "learn" -- the verdict shown for this stroke
 //      headline:  string,   // short plain-English verdict headline
 //      cueClass:  string|null, // which deviation class drove the cue (e.g. "seq","ratio","compress") or null
+//      matchPct:  number|null, // v3 closeness-to-best: trajectory match % vs the reference (null pre-reference)
+//      hasTraj:   boolean,  // v3 whether a compact trajectory was captured for this stroke
 //    }
-//  emitStroke ALSO folds the learned baseline into telemetry via the shape that
-//  getLiveSnapshot() / Copy-log expose. All numbers rounded; no frame/image data.
+//  emitStroke ALSO folds the learned baseline + the reference trajectory into the
+//  telemetry payload (see postTelemetry). All numbers rounded; no frame/image data
+//  -- trajectories are phase-normalised joint COORDINATES only, never pixels.
 // ===========================================================================
 function emitStroke(obj) {
   S.strokeLog.push(obj);
@@ -1061,8 +1354,19 @@ function emitStroke(obj) {
  *  numbers to a remote sink. NEVER sends frames or images. The payload folds
  *  in the learned baseline so a remote sink gets the per-user context. */
 async function postTelemetry(obj) {
-  // The object we WOULD stream (numbers only): the stroke + the current baseline.
-  const _payload = { stroke: obj, baseline: S.baseline, side: S.chosenSide };
+  // The object we WOULD stream (numbers only): the stroke + the current baseline +
+  // the v3 closeness read + a COMPACT reference descriptor (not the full pts array,
+  // to keep the payload small). Still strictly numbers/coordinates -- never frames.
+  const _payload = {
+    stroke: obj,
+    baseline: S.baseline,
+    side: S.chosenSide,
+    closeness: round(S.closeness),
+    referenceSource: S.refSource,
+    referenceMeta: S.reference
+      ? { score: S.reference.score, spm: S.reference.spm, side: S.reference.side, n: S.reference.n }
+      : null,
+  };
   void _payload;
   // TODO: stream to Reachy (endpoint TBD)
   // e.g. await fetch(REACHY_ENDPOINT, { method: "POST", body: JSON.stringify(_payload) });
@@ -1087,6 +1391,14 @@ function getLiveSnapshot() {
     strokes: S.strokeCount,
     score: round(S.score),
     baseline: S.baseline,                    // learned normal (median + robustSD per metric) or null
+    // v3 closeness-to-best (trajectory similarity) -- numbers only.
+    closeness: round(S.closeness),           // smoothed match % vs the reference
+    lastCloseness: round(S.lastCloseness),   // most recent stroke's match %
+    referenceSource: S.refSource,            // "none"|"session-best"|"pinned"|"saved-best"
+    referenceMeta: S.reference                // compact reference descriptor (NOT the full pts array)
+      ? { score: S.reference.score, spm: S.reference.spm, side: S.reference.side,
+          n: S.reference.n, driveFrac: S.reference.driveFrac, at: S.reference.at }
+      : null,
   };
 }
 
@@ -1205,6 +1517,20 @@ async function startCamera() {
 
 function stopStreamTracks() {
   if (S.stream) { S.stream.getTracks().forEach((t) => t.stop()); S.stream = null; }
+}
+
+/** Size the canvas backing store to the stage's displayed pixel size (×DPR,
+ *  capped) for the idle demo / replay when there's no live camera resolution to
+ *  match. Keeps the Tron figure crisp + correctly proportioned pre-Start. While
+ *  live, startCamera() sizes the canvas to the video instead. */
+function sizeCanvasToStage() {
+  if (S.running && S.stream) return;           // live: video resolution governs
+  const rect = stage.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);   // cap DPR for perf
+  const w = Math.round(rect.width * dpr);
+  const h = Math.round(rect.height * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
 }
 
 // ===========================================================================
@@ -1355,6 +1681,32 @@ function onCatch(sample) {
       S.verdict = cls.verdict;
       pushCapped(S.verdicts, cls.verdict.level, CFG.TREND_MAX);
 
+      // --- v3: build this stroke's TRAJECTORY (numbers only) + closeness -----
+      // Resample the frames captured between the previous catch and this one into
+      // a compact phase-normalised trajectory, then (post-calibration) score how
+      // close it is to the reference + maybe adopt it as the new session best.
+      const traj = buildTrajectory(S.strokeFrames, {
+        side: S.chosenSide, score: cls.score, spm: round(60 / period),
+        startT: S.curStrokeStartT, finishT: S.curFinishT,
+      });
+      let matchPct = null;
+      if (traj) {
+        S.lastTraj = traj;
+        // Closeness only matters once we have a reference AND a real score.
+        if (S.reference && cls.score != null) {
+          const c = trajCloseness(traj, S.reference);
+          if (isFiniteNum(c)) {
+            S.lastCloseness = c;
+            S.closenessHistory.push(c);
+            S.closeness = isFiniteNum(S.closeness) ? ema(S.closeness, c, CFG.CLOSE_EMA) : c;
+            matchPct = c;
+          }
+        }
+        // Auto-reference: the best-scoring scored stroke this session becomes the
+        // session reference (unless the user has pinned/loaded one we keep).
+        maybeAdoptReference(traj, cls.score);
+      }
+
       // Emit telemetry (in-memory log + stream stub). Numbers only, rounded.
       emitStroke({
         stroke:    S.strokeCount,
@@ -1379,9 +1731,16 @@ function onCatch(sample) {
         verdict:   cls.verdict.level,
         headline:  cls.verdict.headline,
         cueClass:  cls.cueClass || null,
+        // v3 closeness-to-best (null until a reference exists + the stroke scored).
+        matchPct:  matchPct == null ? null : round(matchPct),
+        hasTraj:   !!traj,
       });
     }
   }
+  // v3: a new stroke starts here -- reset the trajectory frame buffer + timers.
+  S.strokeFrames = [];
+  S.curStrokeStartT = sample.t;
+  S.curFinishT = null;
   // Begin a new drive at this catch.
   S.lastCatch = sample;
   S.phase = "drive";
@@ -1406,6 +1765,8 @@ function onFinish(sample) {
   S.recoveryStart = sample.t;
   // Layback at the finish = the trunk lean right now (smoothed).
   S.finishLeanThisDrive = isFiniteNum(S.leanSm) ? S.leanSm : NaN;
+  // v3: remember when the finish fell so the trajectory can shade drive/recovery.
+  S.curFinishT = sample.t;
 }
 
 function pushCapped(arr, v, cap = CFG.HISTORY) { arr.push(v); if (arr.length > cap) arr.shift(); }
@@ -1903,6 +2264,498 @@ function maybeInsight(m, scored) {
 }
 
 // ===========================================================================
+//  v3 REFERENCE MANAGEMENT  ("your best" target for ghost-compare / replay)
+//  --------------------------------------------------------------------------
+//  The reference is a single trajectory we compare against. It is, in priority:
+//    - a stroke the user PINNED ("Save stroke"), or
+//    - the best-scoring scored stroke this SESSION (auto), or
+//    - the best stroke persisted to localStorage from a PRIOR session (seed).
+//  Reference + closeness are numbers only; the persisted copy is too.
+// ===========================================================================
+
+/** Auto-adopt the best-scoring scored stroke this session as the reference.
+ *  Skips while still calibrating (no score). A pinned reference is NOT
+ *  overwritten by auto-adoption within the same session. */
+function maybeAdoptReference(traj, score) {
+  if (!traj || !isFiniteNum(score)) return;          // only scored strokes qualify
+  if (S.refSource === "pinned") return;              // user's pin wins this session
+  // Adopt if we have no session reference yet, or this stroke beat the best.
+  if (!S.reference || !isFiniteNum(S.refBestScore) || score > S.refBestScore) {
+    S.reference = traj;
+    S.refBestScore = score;
+    S.refSource = "session-best";
+    // Persist if it also beats the stored best (carry the best across sessions).
+    persistBestReferenceIfBetter(traj, score);
+    refreshReferenceUI();
+  }
+}
+
+/** Pin the most-recently-completed stroke as the reference (the "Save stroke"
+ *  control). Overrides auto-adoption for the rest of the session + persists. */
+function pinCurrentReference() {
+  if (!S.lastTraj) return false;
+  S.reference = S.lastTraj;
+  S.refBestScore = isFiniteNum(S.lastTraj.score) ? S.lastTraj.score : S.refBestScore;
+  S.refSource = "pinned";
+  saveReference(S.reference);                        // pinned strokes persist directly
+  refreshReferenceUI();
+  return true;
+}
+
+/** Persist the trajectory to localStorage only if it beats the stored best
+ *  (or none is stored). Keeps the saved "your best" genuinely the best seen. */
+function persistBestReferenceIfBetter(traj, score) {
+  let storedScore = NaN;
+  try {
+    const raw = localStorage.getItem(LS_REFERENCE);
+    if (raw) { const o = JSON.parse(raw); storedScore = o && isFiniteNum(o.score) ? o.score : NaN; }
+  } catch (_) { /* ignore */ }
+  if (!isFiniteNum(storedScore) || score > storedScore) saveReference(traj);
+}
+
+function saveReference(traj) {
+  try { localStorage.setItem(LS_REFERENCE, JSON.stringify(traj)); } catch (_) { /* storage may be full/unavailable */ }
+}
+function loadReferenceSeed() {
+  try {
+    const raw = localStorage.getItem(LS_REFERENCE);
+    if (raw) {
+      const o = JSON.parse(raw);
+      // Validate the restored shape so a corrupt entry can't break rendering.
+      if (o && Array.isArray(o.pts) && o.pts.length >= 2) S.refSeed = o;
+    }
+  } catch (_) { S.refSeed = null; }
+  // If we have a seed and no live reference yet, use it (lets ghost/replay work
+  // from the first stroke of a new session against your stored best).
+  if (S.refSeed && !S.reference) {
+    S.reference = S.refSeed;
+    S.refBestScore = isFiniteNum(S.refSeed.score) ? S.refSeed.score : NaN;
+    S.refSource = "saved-best";
+  }
+}
+
+/** Forget the reference (and its stored copy). Part of the clear-data control. */
+function clearReference() {
+  S.reference = null; S.refSeed = null; S.refBestScore = NaN; S.refSource = "none";
+  S.closeness = NaN; S.lastCloseness = NaN; S.closenessHistory = [];
+  if (S.replaying) stopReplay();
+  try { localStorage.removeItem(LS_REFERENCE); } catch (_) { /* ignore */ }
+  refreshReferenceUI();
+}
+
+/** Human label for where the current reference came from. */
+function refSourceLabel() {
+  switch (S.refSource) {
+    case "pinned":       return "pinned";
+    case "session-best": return "best this session";
+    case "saved-best":   return "your saved best";
+    default:             return "no reference yet";
+  }
+}
+
+/** Sync the reference-dependent controls + tags (enabled state, button labels,
+ *  the panel ref tag, the match chip visibility). Safe to call any time. */
+function refreshReferenceUI() {
+  const have = !!S.reference;
+  if (replayBtn) {
+    replayBtn.disabled = !have;
+    replayBtn.textContent = S.replaying ? "Stop replay" : "Replay best";
+    replayBtn.classList.toggle("active", S.replaying);
+  }
+  if (saveStrokeBtn) saveStrokeBtn.disabled = !S.lastTraj;
+  if (ghostBtn) {
+    ghostBtn.textContent = "Ghost: " + (S.ghostOn ? "ON" : "OFF");
+    ghostBtn.classList.toggle("active", S.ghostOn && have);
+    ghostBtn.disabled = !have;          // nothing to ghost against without a reference
+  }
+  if (el.refTag) {
+    el.refTag.textContent = refSourceLabel() + (have && isFiniteNum(S.reference.score) ? ` · ${Math.round(S.reference.score)}` : "");
+    el.refTag.classList.toggle("has-ref", have);
+  }
+  // The HUD match chip only shows once we have a reference (and, ideally, a read).
+  if (el.hudMatch) el.hudMatch.style.display = (have && S.running) ? "block" : "none";
+}
+
+// ===========================================================================
+//  v3 TRON RENDERER  (the live neon hero figure)
+//  --------------------------------------------------------------------------
+//  Renders the pose as a glowing Tron figure on a calm, Monument-Valley-graded
+//  backdrop (dusk gradient + faint floor grid). Reads from ~2-3 m: thick limbs,
+//  bright joint nodes, a prominent HANDLE node, a short fading motion trail, and
+//  a faint level bar-path trace. State colours map straight from the verdict:
+//    good  -> teal/cyan glow      (the default, gorgeous, calm state)
+//    warn  -> amber               (a one-off deviation this stroke)
+//    bad   -> red flare on the OFFENDING segment (a real, repeated fault)
+//  prefers-reduced-motion trims the trail + glow pulse but keeps it legible.
+// ===========================================================================
+
+/* Glow palettes per state (kept in JS so shadowBlur colours are exact). */
+const TRON = {
+  good: { limb: "#28f0d6", glow: "rgba(40,240,214,0.9)",  node: "#dffff8", handle: "#5ffce6" },
+  warn: { limb: "#ffc24d", glow: "rgba(255,194,77,0.85)", node: "#fff0d0", handle: "#ffd27a" },
+  bad:  { limb: "#ff6b6b", glow: "rgba(255,107,107,0.9)", node: "#ffe2e2", handle: "#ff9a9a" },
+  ghost:{ limb: "rgba(90,180,180,0.5)", glow: "rgba(40,200,190,0.35)", node: "rgba(180,240,235,0.6)", handle: "rgba(120,230,220,0.7)" },
+};
+
+/** Resolve the current figure STATE colour from the verdict level. */
+function figureState() {
+  const lvl = S.verdict && S.verdict.level;
+  if (lvl === "bad") return "bad";
+  if (lvl === "warn") return "warn";
+  return "good";                                     // learn/idle/good all read calm-teal
+}
+
+/** Paint the calm dusk backdrop + faint floor grid (Monument-Valley graded).
+ *  Drawn first, every frame, so the figure sits on a premium stage not black.
+ *  When the user has lifted the video scrim ("Show video"), we instead clear to
+ *  TRANSPARENT so the dim camera feed shows behind the neon figure (the optional
+ *  dim layer). Default (feedback-first) = the opaque dusk stage. */
+function drawBackdrop(W, H) {
+  // Show-video mode: clear to transparent, then lay a translucent dusk wash so
+  // the camera feed reads as a DIM reference layer behind the neon figure (not a
+  // full-brightness video -- Dan doesn't want to watch himself). A faint grid
+  // still helps the figure read.
+  if (!stage.classList.contains("dimvideo")) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(7, 11, 16, 0.45)";     // dim wash over the live video
+    ctx.fillRect(0, 0, W, H);
+    drawFloorGrid(W, H, 0.5);
+    return;
+  }
+  // Deep dusk vertical gradient.
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0,   "#0a1622");
+  g.addColorStop(0.45,"#0b1119");
+  g.addColorStop(1,   "#070b10");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // Soft warm horizon glow low-centre (the "dusk" tint), subtle.
+  const horizonY = H * 0.72;
+  const rg = ctx.createRadialGradient(W * 0.5, horizonY, 0, W * 0.5, horizonY, Math.max(W, H) * 0.55);
+  rg.addColorStop(0, "rgba(36, 120, 150, 0.16)");
+  rg.addColorStop(1, "rgba(36, 120, 150, 0)");
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, W, H);
+
+  drawFloorGrid(W, H, 1);
+}
+
+/** Faint perspective floor grid below the horizon. `intensity` scales opacity
+ *  (lower when drawn over the live video so the feed still reads). */
+function drawFloorGrid(W, H, intensity) {
+  const horizonY = H * 0.72;
+  ctx.save();
+  ctx.strokeStyle = "rgba(90, 150, 175, 0.10)";
+  ctx.lineWidth = Math.max(1, W / 900);
+  // Horizontals: spacing widens downward for a gentle ground-plane feel.
+  for (let i = 0; i <= 6; i++) {
+    const f = i / 6;
+    const y = horizonY + (H - horizonY) * (f * f);   // quadratic -> perspective
+    ctx.globalAlpha = (0.7 - f * 0.4) * intensity;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // Verticals fanning slightly from a central vanishing point.
+  ctx.globalAlpha = 0.5 * intensity;
+  const vx = W * 0.5;
+  for (let i = -5; i <= 5; i++) {
+    const topX = vx + i * (W * 0.018);
+    const botX = vx + i * (W * 0.12);
+    ctx.beginPath(); ctx.moveTo(topX, horizonY); ctx.lineTo(botX, H); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Draw ONE figure (6 screen-space joints) as glowing limbs + nodes + head ring.
+ *  `pal` = TRON palette; `flareBone` = index into TRAJ_BONES to force-red, or -1;
+ *  `scaleR` = node/limb scale (px reference); `glow` = enable shadowBlur. */
+function drawFigure(pts, pal, flareBone, scaleR, glow) {
+  const limbW = Math.max(3, scaleR * 0.5);
+  // Limbs.
+  for (let bi = 0; bi < TRAJ_BONES.length; bi++) {
+    const [a, b] = TRAJ_BONES[bi];
+    const pa = pts[a], pb = pts[b];
+    if (!pa || !pb) continue;
+    const flaring = (bi === flareBone);
+    ctx.strokeStyle = flaring ? TRON.bad.limb : pal.limb;
+    ctx.lineWidth = limbW * (flaring ? 1.15 : 1);
+    ctx.lineCap = "round";
+    if (glow) { ctx.shadowColor = flaring ? TRON.bad.glow : pal.glow; ctx.shadowBlur = scaleR * (flaring ? 3.4 : 2.4); }
+    ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // Joint nodes (knees, hips, shoulders, ankle, elbow). Bright, glowing dots.
+  const nodeIdx = [TJ.ANK, TJ.KNEE, TJ.HIP, TJ.SHO, TJ.ELB];
+  for (const k of nodeIdx) {
+    const p = pts[k]; if (!p) continue;
+    const big = (k === TJ.KNEE || k === TJ.HIP || k === TJ.SHO);   // emphasise the big joints
+    const rr = scaleR * (big ? 0.62 : 0.46);
+    if (glow) { ctx.shadowColor = pal.glow; ctx.shadowBlur = scaleR * 1.8; }
+    ctx.fillStyle = pal.node;
+    ctx.beginPath(); ctx.arc(p[0], p[1], rr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  // HANDLE node (the hand/wrist) -- the most prominent node + a ring around it.
+  const hand = pts[TJ.HAND];
+  if (hand) {
+    if (glow) { ctx.shadowColor = pal.glow; ctx.shadowBlur = scaleR * 2.6; }
+    ctx.fillStyle = pal.handle;
+    ctx.beginPath(); ctx.arc(hand[0], hand[1], scaleR * 0.85, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = pal.handle; ctx.lineWidth = Math.max(1.5, scaleR * 0.18);
+    ctx.beginPath(); ctx.arc(hand[0], hand[1], scaleR * 1.35, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // Head as a RING above the shoulder (we don't track the head joint precisely;
+  // place it along the trunk direction beyond the shoulder).
+  const sho = pts[TJ.SHO], hip = pts[TJ.HIP];
+  if (sho && hip) {
+    const dx = sho[0] - hip[0], dy = sho[1] - hip[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const hx = sho[0] + (dx / len) * scaleR * 2.0;
+    const hy = sho[1] + (dy / len) * scaleR * 2.0;
+    if (glow) { ctx.shadowColor = pal.glow; ctx.shadowBlur = scaleR * 1.6; }
+    ctx.strokeStyle = pal.node; ctx.lineWidth = Math.max(2, scaleR * 0.28);
+    ctx.beginPath(); ctx.arc(hx, hy, scaleR * 1.05, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+}
+
+/** The LIVE Tron hero: backdrop + bar-path + motion trail + ghost + the figure.
+ *  Draws from the live landmarks (so it tracks the rower), with the reference
+ *  ghost aligned onto him for the headline ghost-compare. */
+function drawTronLive(lm, side) {
+  const W = canvas.width, H = canvas.height;
+  drawBackdrop(W, H);
+
+  // Pull the 6 tracked joints in SCREEN space for this frame.
+  const idx = sideTrajIdx(side);
+  const pts = idx.map((i) => {
+    const p = lm[i];
+    return (p && isFiniteNum(p.x) && isFiniteNum(p.y) && (p.visibility ?? 0) >= 0.3) ? [p.x * W, p.y * H] : null;
+  });
+  const scaleR = Math.max(5, W / 95);                // node/limb scale for ~2-3 m legibility
+
+  // --- bar-path trace: the HANDLE's recent path (should run roughly level) ---
+  const hand = pts[TJ.HAND];
+  if (hand) {
+    S.barPath.push([hand[0], hand[1]]);
+    if (S.barPath.length > CFG.BARPATH_MAX) S.barPath.shift();
+  }
+  if (S.barPath.length > 2) {
+    ctx.save();
+    ctx.lineWidth = Math.max(1.5, scaleR * 0.22);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(95, 252, 230, 0.22)";
+    ctx.beginPath();
+    ctx.moveTo(S.barPath[0][0], S.barPath[0][1]);
+    for (let i = 1; i < S.barPath.length; i++) ctx.lineTo(S.barPath[i][0], S.barPath[i][1]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // --- fading motion trail: a few recent whole-figure frames, dimming back ----
+  if (!S.reduceMotion) {
+    S.trail.push(pts.map((p) => (p ? [p[0], p[1]] : null)));
+    if (S.trail.length > CFG.TRAIL_MAX) S.trail.shift();
+    const pal = TRON[figureState()];
+    for (let t = 0; t < S.trail.length - 1; t++) {
+      const a = (t + 1) / S.trail.length * 0.35;     // older = fainter (max ~0.35)
+      ctx.globalAlpha = a;
+      drawTrailFigure(S.trail[t], pal, scaleR * (0.6 + 0.4 * (t / S.trail.length)));
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    // Reduced-motion: keep the buffer fresh (for ghost align) but don't paint it.
+    S.trail.push(pts.map((p) => (p ? [p[0], p[1]] : null)));
+    if (S.trail.length > CFG.TRAIL_MAX) S.trail.shift();
+  }
+
+  // --- ghost-compare: the reference, aligned onto the live figure, dim teal ----
+  let flareBone = -1;
+  if (S.ghostOn && S.reference && !S.replaying) {
+    const ghostPts = alignReferenceToLive(S.reference, pts, side);
+    if (ghostPts) drawFigure(ghostPts, TRON.ghost, -1, scaleR * 0.92, !S.reduceMotion);
+    // If a joint diverges beyond threshold, flare the nearest live limb amber.
+    flareBone = divergingBone();
+  }
+
+  // --- the live figure on top -----------------------------------------------
+  const pal = TRON[figureState()];
+  // A real, repeated back-opening fault flares the TRUNK bone red.
+  let liveFlare = flareBone;
+  if (S.verdict && S.verdict.level === "bad" && S.verdict.cueClass === "seq") liveFlare = TRUNK_BONE_INDEX;
+  drawFigure(pts, pal, liveFlare, scaleR, true);
+}
+
+/** A lighter figure used for trail frames (limbs + handle only -- cheap). */
+function drawTrailFigure(pts, pal, scaleR) {
+  if (!pts) return;
+  ctx.strokeStyle = pal.limb; ctx.lineWidth = Math.max(2, scaleR * 0.42); ctx.lineCap = "round";
+  for (const [a, b] of TRAJ_BONES) {
+    const pa = pts[a], pb = pts[b]; if (!pa || !pb) continue;
+    ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+  }
+  const hand = pts[TJ.HAND];
+  if (hand) { ctx.fillStyle = pal.handle; ctx.beginPath(); ctx.arc(hand[0], hand[1], scaleR * 0.6, 0, Math.PI * 2); ctx.fill(); }
+}
+
+/** Map a reference (canonical) trajectory onto the live figure's hip + scale, at
+ *  the live stroke's current phase, so the ghost overlays the rower. Returns the
+ *  ghost's 6 screen-space joints, or null. */
+function alignReferenceToLive(ref, livePts, side) {
+  const hipLive = livePts[TJ.HIP], shoLive = livePts[TJ.SHO];
+  if (!hipLive) return null;
+  // Live body scale in px (trunk length), to size the canonical ghost to match.
+  let bodyPx = (shoLive) ? Math.hypot(shoLive[0] - hipLive[0], shoLive[1] - hipLive[1]) : NaN;
+  if (!isFiniteNum(bodyPx) || bodyPx < 1) bodyPx = canvas.width / 6;
+  // Phase index through the stroke so far (same basis as updateLiveDivergence).
+  const frac = clamp(S.strokeFrames.length / Math.max(TRAJ_N, S.strokeFrames.length), 0, 1);
+  const i = Math.min(ref.pts.length - 1, Math.round(frac * (ref.pts.length - 1)));
+  const frame = ref.pts[i];
+  if (!frame) return null;
+  // No side-mirroring (see trajJointDistances): canonical x-orientation is
+  // consistent at a fixed machine; the ghost maps straight onto the live hip.
+  return frame.map((p) => p ? [hipLive[0] + p[0] * bodyPx, hipLive[1] + p[1] * bodyPx] : null);
+}
+
+/** Which TRAJ_BONE (if any) is diverging from the reference beyond threshold?
+ *  Returns the bone index to flare amber, or -1. Picks the bone whose endpoints
+ *  carry the largest live divergence. */
+function divergingBone() {
+  const d = S.liveDivergence;
+  if (!d) return -1;
+  let worst = -1, worstV = CFG.DIVERGE_FLARE;
+  for (let bi = 0; bi < TRAJ_BONES.length; bi++) {
+    const [a, b] = TRAJ_BONES[bi];
+    const v = Math.max(isFiniteNum(d[a]) ? d[a] : 0, isFiniteNum(d[b]) ? d[b] : 0);
+    if (v > worstV) { worstV = v; worst = bi; }
+  }
+  return worst;
+}
+
+// ===========================================================================
+//  v3 IDLE DEMO + REPLAY  (attract loop / study the reference)
+//  --------------------------------------------------------------------------
+//  Idle demo: a smooth CANNED stroke renders the Tron figure rowing before
+//  Start (and when there's no camera) so the look is visible without a camera.
+//  Replay: the saved reference trajectory loops as a Tron cartoon to study.
+//  Both share renderCanonFigure(): they draw a canonical trajectory FRAME into
+//  the stage box (centred, scaled to fit), through the same Tron primitives.
+// ===========================================================================
+
+let _attractRAF = 0;       // RAF handle for the idle/replay loop
+let _attractT0 = 0;        // start timestamp for phase
+
+/** Render a canonical trajectory frame (6×[x,y], hip at origin) fitted into the
+ *  stage box, centred, with a comfortable margin. Shared by idle demo + replay. */
+function renderCanonFigure(frame, pal, label, flareBone) {
+  const W = canvas.width, H = canvas.height;
+  drawBackdrop(W, H);
+  if (!frame) return;
+  // Fit: canonical coords are ~[-2..2]; map to a centred box ~62% of min dim.
+  const box = Math.min(W, H) * 0.62;
+  const cx = W * 0.5, cy = H * 0.52;
+  const scr = box / 4.2;                              // canonical-units -> px
+  const scaleR = Math.max(5, W / 95);
+  const pts = frame.map((p) => p ? [cx + p[0] * scr, cy + p[1] * scr] : null);
+  drawFigure(pts, pal, flareBone == null ? -1 : flareBone, scaleR, !S.reduceMotion);
+  // Small caption (e.g. "PREVIEW" / "REPLAY · best 87").
+  if (label) {
+    ctx.save();
+    ctx.fillStyle = "rgba(223,255,248,0.55)";
+    ctx.font = `600 ${Math.max(11, W / 46)}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText(label, cx, H * 0.92);
+    ctx.restore();
+  }
+}
+
+/* A smooth, synthetic side-on rowing stroke as a canonical trajectory. Built
+   once: hip at origin, a believable catch->drive->finish->recovery cycle for
+   ankle/knee/hip/shoulder/elbow/hand. Numbers only; purely cosmetic. */
+const DEMO_TRAJ = (function buildDemoTraj() {
+  const pts = [];
+  for (let i = 0; i < TRAJ_N; i++) {
+    const ph = i / TRAJ_N;                            // 0..1 around the cycle
+    // Drive on the first ~45%, recovery after; ease with a smooth cosine.
+    const drive = ph < 0.45 ? (ph / 0.45) : 0;        // 0..1 over the drive
+    const recov = ph >= 0.45 ? ((ph - 0.45) / 0.55) : 0;
+    // `slide` 0 at catch -> 1 at finish -> back to 0 (hip stays at origin; the
+    // limbs articulate around it). We move the FEET/handle relative to the hip.
+    const ease = (x) => 0.5 - 0.5 * Math.cos(Math.PI * clamp(x, 0, 1));
+    const s = ph < 0.45 ? ease(drive) : 1 - ease(recov);    // 0..1 extension
+    // Ankle: fixed footplate, ahead of + below the hip.
+    const ank = [1.35, 1.55];
+    // Knee: high & near the hip at the catch (compressed), drops & extends to the finish.
+    const knee = [0.95 - 0.15 * s, 0.95 - 0.35 * s];
+    // Shoulder: leans forward at the catch (+x), swings back past vertical at finish.
+    const lean = -0.35 + 0.95 * s;                    // -forward .. +layback
+    const sho = [lean * 0.55, -1.5];
+    // Elbow: tracks between shoulder and hand.
+    const handReach = 1.45 - 1.7 * s;                 // hand far at catch, drawn in at finish
+    const handY = -1.15 + 0.15 * Math.sin(Math.PI * s);  // roughly level path
+    const hand = [handReach, handY];
+    const elb = [sho[0] * 0.4 + hand[0] * 0.6, sho[1] * 0.5 + hand[1] * 0.5];
+    pts.push([ank, knee, [0, 0], sho, elb, hand]);
+  }
+  return { n: TRAJ_N, side: "right", score: null, spm: 24, driveFrac: 0.45, keys: TRAJ_KEYS.slice(), pts, at: 0 };
+})();
+
+/** The attract/idle loop: animate DEMO_TRAJ (or the reference during replay) as
+ *  a looping Tron cartoon. Runs only when NOT live (no camera inference). */
+function attractLoop(ts) {
+  if (S.running && !S.replaying) { _attractRAF = 0; return; }   // live view owns the canvas
+  // Keep the canvas matched to the stage (handles rotate / resize pre-Start and
+  // during replay when not bound to a live video resolution).
+  if (!(S.running && S.stream)) sizeCanvasToStage();
+  if (!_attractT0) _attractT0 = ts;
+  const elapsed = (ts - _attractT0) / 1000;
+  const cycleS = S.replaying && S.reference && S.reference.spm ? (60 / S.reference.spm) * 1.4 : 2.6;
+  const phase = (elapsed % cycleS) / cycleS;          // 0..1 loop
+  const traj = (S.replaying && S.reference) ? S.reference : DEMO_TRAJ;
+  const i = Math.min(traj.pts.length - 1, Math.floor(phase * traj.pts.length));
+  const frame = traj.pts[i];
+  // Replay uses the calm-teal palette; idle demo too (it's an attract preview).
+  const label = S.replaying
+    ? `REPLAY · your best${isFiniteNum(traj.score) ? " · " + Math.round(traj.score) : ""}`
+    : "PREVIEW · this is the look";
+  renderCanonFigure(frame, TRON.good, label, -1);
+  _attractRAF = requestAnimationFrame(attractLoop);
+}
+
+/** Start the idle/attract loop (idempotent). */
+function startAttract() {
+  if (_attractRAF) return;
+  _attractT0 = 0;
+  _attractRAF = requestAnimationFrame(attractLoop);
+}
+function stopAttract() {
+  if (_attractRAF) { cancelAnimationFrame(_attractRAF); _attractRAF = 0; }
+}
+
+/** Toggle replay of the saved reference as a looping Tron cartoon. */
+function startReplay() {
+  if (!S.reference) return;
+  S.replaying = true;
+  _attractT0 = 0;
+  if (S.running) {
+    // Pause live inference visuals; the attract loop takes the canvas.
+    startAttract();
+  } else {
+    startAttract();
+  }
+  refreshReferenceUI();
+}
+function stopReplay() {
+  S.replaying = false;
+  refreshReferenceUI();
+  if (!S.running) startAttract();      // back to idle preview
+  // If live, the main loop reclaims the canvas on its next frame.
+}
+
+// ===========================================================================
 //  RENDER: skeleton overlay  [PRESERVED from v1; trunk colour now aqua/amber]
 // ===========================================================================
 function drawSkeleton(lm, side, faulting) {
@@ -2080,6 +2933,19 @@ function renderDebug() {
   el.dvLegProg.textContent = s.legProgress == null ? "–" : s.legProgress;
   el.dvBackOpen.textContent = s.backOpeningDeg == null ? "–" : s.backOpeningDeg + "°";
   el.dvState.textContent = `${s.phase || "–"} · ${s.calState}`;
+  // v3 closeness + capture diagnostics.
+  el.dvMatch.textContent = s.closeness == null ? "–" : s.closeness + "%";
+  el.dvLastMatch.textContent = s.lastCloseness == null ? "–" : s.lastCloseness + "%";
+  el.dvFrames.textContent = String(S.strokeFrames.length);
+
+  // v3 reference block (the "your best" trajectory we compare against).
+  const r = S.reference;
+  el.rvSource.textContent = refSourceLabel();
+  el.rvScore.textContent  = (r && isFiniteNum(r.score)) ? String(Math.round(r.score)) : "–";
+  el.rvSpm.textContent    = (r && isFiniteNum(r.spm)) ? String(Math.round(r.spm)) : "–";
+  el.rvSide.textContent   = r ? (r.side || "–") : "–";
+  el.rvN.textContent      = r ? String(r.n) : "–";
+  el.rvDrive.textContent  = (r && isFiniteNum(r.driveFrac)) ? r.driveFrac : "–";
 
   // Learned baseline block (or the seed restored from localStorage).
   const b = S.baseline || S.baselineSeed;
@@ -2098,7 +2964,7 @@ function renderDebug() {
   // Per-stroke log table (newest first).
   const rows = S.strokeLog.slice().reverse();
   if (!rows.length) {
-    el.logBody.innerHTML = '<tr><td colspan="11" class="log-empty">No strokes logged yet — start rowing.</td></tr>';
+    el.logBody.innerHTML = '<tr><td colspan="12" class="log-empty">No strokes logged yet — start rowing.</td></tr>';
     return;
   }
   const cell = (v, suffix = "") => (v == null ? "–" : v + suffix);
@@ -2113,6 +2979,7 @@ function renderDebug() {
       <td>${cell(r.minKnee, "°")}</td>
       <td>${r.devSigma == null ? "–" : r.devSigma + "σ"}</td>
       <td>${r.score == null ? "–" : r.score}</td>
+      <td>${r.matchPct == null ? "–" : r.matchPct + "%"}</td>
       <td class="${r.cueClass ? "yes" : "no"}">${r.cueClass ? r.cueClass : "·"}</td>
       <td class="verdict">${r.verdict}</td>
     </tr>`).join("");
@@ -2141,6 +3008,18 @@ function renderUI() {
     el.bar.style.width = c + "%";
     el.bar.style.background = c >= 70 ? "var(--aqua)" : c >= 50 ? "var(--amber)" : "var(--red)";
   }
+
+  // v3: match-to-best (closeness). Panel metric + HUD chip. "–" until we have one.
+  const matchVal = isFiniteNum(S.closeness) ? Math.round(S.closeness) : null;
+  if (matchVal == null) {
+    el.match.textContent = "–";
+    el.matchBar.style.width = "0%";
+  } else {
+    el.match.textContent = String(matchVal);
+    el.matchBar.style.width = matchVal + "%";
+    el.matchBar.style.background = matchVal >= 85 ? "var(--aqua)" : matchVal >= 65 ? "var(--amber)" : "var(--red)";
+  }
+  if (el.hudMatchVal) el.hudMatchVal.textContent = matchVal == null ? "–" : matchVal + "%";
 
   // Hero ring + the stable per-stroke verdict (panel + HUD).
   renderRing();
@@ -2185,7 +3064,12 @@ function loop() {
       processPose(poses[0], t);     // numbers only out of this; frame not kept
     } else {
       S.visOk = false;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      S.curFrameJoints = null;
+      // While replaying, the attract loop owns the canvas -- don't clear it.
+      if (!S.replaying) {
+        if (S.viewMode === "skeleton") ctx.clearRect(0, 0, canvas.width, canvas.height);
+        else drawBackdrop(canvas.width, canvas.height);   // keep the premium stage, not black
+      }
       if (S.strokeCount === 0) {
         S.verdict = { level: "idle", headline: "Reposition", detail: "Stand side-on with your full body in frame." };
       }
@@ -2234,6 +3118,23 @@ function processPose(lm, t) {
     S.armCloseCatch = S.armCloseSm;
   }
 
+  // --- v3 TRAJECTORY CAPTURE (numbers only) ---------------------------------
+  // Snapshot the 6 tracked joints (screen-normalised [x,y]) for THIS frame and
+  // buffer them for the current stroke. onCatch() resamples this buffer into a
+  // compact trajectory when the stroke completes, then clears it. No frame/image
+  // data is ever retained -- just these joint coordinates.
+  const trajIdx = sideTrajIdx(side);
+  const frameJoints = trajIdx.map((i) => {
+    const p = lm[i];
+    return (p && isFiniteNum(p.x) && isFiniteNum(p.y)) ? [p.x, p.y] : null;
+  });
+  S.curFrameJoints = frameJoints;          // also used by the live Tron renderer + ghost
+  if (S.phase !== "idle") {
+    S.strokeFrames.push({ t, j: frameJoints });
+    // Hard cap so a very slow / stalled stroke can't grow the buffer unbounded.
+    if (S.strokeFrames.length > 600) S.strokeFrames.shift();
+  }
+
   // Stroke segmentation (uses its own smoothed compression + kneeNorm signals).
   // NB: onCatch() inside here finalises + CLASSIFIES the previous stroke once.
   updateSegmentation(t, j, feetX, S.leanSm, kneeNorm);
@@ -2241,10 +3142,50 @@ function processPose(lm, t) {
   // Sequencing capture -- runs during the drive against the catch baselines.
   updateSequencing(t, S.leanSm, S.kneeNormSm, S.armCloseSm);
 
-  // Draw the skeleton. Trunk turns amber only if a live sequencing deviation is
-  // active for the CURRENT verdict (calm by default).
-  const liveSeqFlag = S.phase === "drive" && S.verdict && S.verdict.cueClass === "seq";
-  drawSkeleton(lm, side, liveSeqFlag);
+  // --- LIVE GHOST DIVERGENCE -------------------------------------------------
+  // If we have a reference + enough of the current stroke captured, measure how
+  // far the live figure is from the reference (per joint) so the renderer can
+  // flare a diverging segment amber. Cheap; uses the partial stroke so far.
+  updateLiveDivergence();
+
+  // Draw the live figure. Tron (neon) is the default hero; the legacy skeleton
+  // overlay stays available via the view toggle. While REPLAYING, the attract
+  // loop owns the canvas (showing the reference cartoon) -- so we skip drawing
+  // here to avoid two writers fighting over the same canvas (no flicker).
+  if (S.replaying) return;
+  const faulting = S.phase === "drive" && S.verdict && S.verdict.cueClass === "seq";
+  if (S.viewMode === "skeleton") {
+    drawSkeleton(lm, side, faulting);
+  } else {
+    drawTronLive(lm, side);
+  }
+}
+
+/** Live ghost divergence: compare the partial current stroke against the
+ *  reference (canonical) at the matching phase, producing a per-joint distance
+ *  array. Drives the amber flare on the diverging segment during ghost-compare. */
+function updateLiveDivergence() {
+  S.liveDivergence = null;
+  if (!S.ghostOn || !S.reference || S.replaying) return;
+  if (S.strokeFrames.length < CFG.GHOST_MIN_FRAMES) return;
+  // Canonicalise the most recent live frame and compare to the reference frame
+  // at the same phase fraction through the stroke so far.
+  const last = S.curFrameJoints;
+  const cf = canonFrame(last);
+  if (!cf) return;
+  // Phase fraction: where we are within the expected stroke. Approximate using
+  // elapsed time since the catch over the reference's typical period is overkill;
+  // instead use buffer position vs a nominal full-stroke length (TRAJ_N steps).
+  const frac = clamp(S.strokeFrames.length / Math.max(TRAJ_N, S.strokeFrames.length), 0, 1);
+  const idx = Math.min(S.reference.pts.length - 1, Math.round(frac * (S.reference.pts.length - 1)));
+  const ref = S.reference.pts[idx];
+  if (!ref) return;
+  const dist = new Array(6).fill(NaN);
+  for (let k = 0; k < 6; k++) {
+    const pa = cf[k], pb = ref[k];
+    if (pa && pb) dist[k] = Math.hypot(pa[0] - pb[0], pa[1] - pb[1]);
+  }
+  S.liveDivergence = dist;
 }
 
 // ===========================================================================
@@ -2420,6 +3361,10 @@ async function start() {
   recalibBtn.disabled = false;
   flipBtn.disabled = false;
   cameraBtn.disabled = false;
+  // v3: leaving the idle attract loop; the live loop owns the canvas now.
+  S.replaying = false;
+  stopAttract();
+  refreshReferenceUI();
   // Fresh verdict + begin calibration at session start.
   beginCalibration();
   S.verdict = { level: "learn", headline: "Settling in", detail: "Find your rhythm — I'm about to learn your stroke." };
@@ -2440,6 +3385,10 @@ function stop() {
   recalibBtn.disabled = true;
   flipBtn.disabled = true;
   cameraBtn.disabled = true;
+  // v3: clear live trails + drop back to the idle Tron preview.
+  S.trail = []; S.barPath = []; S.liveDivergence = null;
+  refreshReferenceUI();
+  startAttract();
   // Save this session's summary (numbers only) before tearing down.
   commitSessionSummary();
   showOverlay("Stopped", "Camera is off and the live feed has stopped. Your session summary (numbers only) is saved on this device.");
@@ -2474,8 +3423,14 @@ function resetMetrics() {
     verdict: { level: "learn", headline: "Settling in", detail: "Find your rhythm — re-learning your stroke." },
     verdicts: [], lastSeq: null, strokeLog: [],
     score: NaN, lastStrokeScore: NaN, scoreHistory: [],
+    // v3: reset the trajectory capture + live closeness (geometry changed). The
+    // REFERENCE itself is kept (it's pose-normalised + can be mirrored across sides).
+    strokeFrames: [], curFrameJoints: null, curFinishT: null, lastTraj: null,
+    trail: [], barPath: [], liveDivergence: null,
+    closeness: NaN, lastCloseness: NaN, closenessHistory: [],
   });
   beginCalibration();
+  refreshReferenceUI();
   lastVideoTime = -1;
 }
 
@@ -2518,11 +3473,52 @@ clearHistBtn.addEventListener("click", () => {
   renderProgress();
 });
 
+// --- v3 kinetic-loop controls --------------------------------------------------
+
+// Save stroke: pin the most recent stroke as the reference to beat.
+saveStrokeBtn.addEventListener("click", () => {
+  const ok = pinCurrentReference();
+  el.histNote.textContent = ok
+    ? "Pinned that stroke as your reference. Ghost-compare now optimises against it."
+    : "No completed stroke to pin yet — row a stroke first.";
+});
+
+// Replay: loop the saved reference as a Tron cartoon (toggle).
+replayBtn.addEventListener("click", () => {
+  if (S.replaying) stopReplay(); else startReplay();
+});
+
+// Ghost: toggle the live ghost-compare overlay.
+ghostBtn.addEventListener("click", () => {
+  S.ghostOn = !S.ghostOn;
+  refreshReferenceUI();
+});
+
+// View: switch between the neon Tron figure (default) and the legacy skeleton.
+viewBtn.addEventListener("click", () => {
+  S.viewMode = (S.viewMode === "tron") ? "skeleton" : "tron";
+  viewBtn.textContent = "View: " + (S.viewMode === "tron" ? "Tron" : "Skeleton");
+  viewBtn.classList.toggle("active", S.viewMode === "tron");
+  // Clear the trail/bar-path so switching views doesn't leave stale ghosts.
+  S.trail = []; S.barPath = [];
+});
+
+// Clear best stroke: forget the reference + its stored copy (numbers-only).
+clearRefBtn.addEventListener("click", () => {
+  clearReference();
+  el.histNote.textContent = "Best-stroke reference cleared. The next strong stroke becomes your new best.";
+});
+
 // "Copy log" -- copies the per-stroke log + learned baseline as JSON.
 el.copyLogBtn.addEventListener("click", async () => {
   const payload = JSON.stringify({
     baseline: S.baseline || S.baselineSeed || null,
     liveSnapshot: getLiveSnapshot(),
+    // v3: the full reference trajectory (numbers only) + this session's match-% trend,
+    // so a session can be replayed/inspected offline. No frames/images, ever.
+    reference: S.reference || null,
+    refSource: S.refSource,
+    closenessHistory: S.closenessHistory.map((v) => round(v)),
     strokes: S.strokeLog,
   }, null, 2);
   let ok = false;
@@ -2556,10 +3552,28 @@ document.addEventListener("visibilitychange", () => {
 });
 
 // ---------------------------------------------------------------------------
-//  Boot: restore baseline seed + history, paint the progress panel.
+//  Boot: restore baseline seed + reference + history, start the idle preview.
 // ---------------------------------------------------------------------------
 loadBaselineSeed();
+loadReferenceSeed();        // v3: restore the best-stroke reference (numbers only)
 renderProgress();
+
+// Honour prefers-reduced-motion: trims the Tron motion trail + glow pulse, keeps
+// everything legible. Reacts live if the OS setting changes.
+const _rm = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+function applyReducedMotion() { S.reduceMotion = !!(_rm && _rm.matches); }
+applyReducedMotion();
+if (_rm) { (_rm.addEventListener ? _rm.addEventListener("change", applyReducedMotion) : _rm.addListener(applyReducedMotion)); }
+
+// Reflect the restored reference in the controls + start the idle Tron preview
+// so the look is visible immediately, before any camera.
+refreshReferenceUI();
+sizeCanvasToStage();
+startAttract();
+
+// Re-size the idle/replay canvas on viewport changes (rotate / resize).
+window.addEventListener("resize", () => { if (!(S.running && S.stream)) sizeCanvasToStage(); });
+window.addEventListener("orientationchange", () => { setTimeout(() => { if (!(S.running && S.stream)) sizeCanvasToStage(); }, 250); });
 
 // Secure-context guidance up front (getUserMedia needs https or localhost).
 if (!window.isSecureContext && location.protocol !== "http:") {
