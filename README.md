@@ -1,14 +1,26 @@
-# Rowing Form Coach
+# GHOST
 
-A single-file, **fully on-device** indoor-rowing form coach. Point a side-on
-webcam at yourself on the erg and it analyses your stroke live — body lean,
-knee angle, stroke rate, drive:recovery ratio, consistency, and the headline
-fault it hunts for: **opening your back too early on the drive**.
+**Row your ghost.** A single-file, **fully on-device** indoor-rowing form coach.
+Point a side-on webcam at yourself on the erg and a luminous neon figure mirrors
+your stroke on a calm Monument-Valley dusk — body lean, knee angle, stroke rate,
+drive:recovery ratio, consistency, and the headline fault it hunts for: **opening
+your back too early on the drive.** Save your best stroke and a **ghost** of it
+overlays your live figure so you can row to match the ghost of your best self.
+
+GHOST also **sharpens its own analysis over time.** Rather than fixed thresholds,
+it learns the distribution of *your* strokes and tunes its own sensitivity so it
+flags only your genuinely off strokes — and when it can't see you cleanly, it says
+so and softens instead of guessing.
+
+The screen is deliberately lean: the figure is the hero, with one score read and
+one coaching cue. Everything else — controls, your ghost, progress, the debug
+panel — lives behind a single **⋯** menu.
 
 It runs entirely in your browser. **It never records, uploads, or saves a
 single frame.** Each camera frame is read for pose landmarks and immediately
-discarded. The only thing kept in memory is a handful of derived numbers for
-the current session, and even those are wiped the moment you reload the page.
+discarded. What's kept is a handful of derived **numbers** — your session
+summaries, your best-stroke shape, and what the coach has learned about its own
+sensitivity — stored locally on your device. Never any video.
 
 ---
 
@@ -35,8 +47,9 @@ Then:
 1. Press **Start** and allow camera access when prompted.
 2. Sit **side-on** to the camera, ~2–3 m back, with your **whole body in
    frame** (head to feet). Good, even lighting helps the pose model a lot.
-3. Row. Metrics and a single coaching cue update live. Press **Stop** to
-   release the camera.
+3. Row. The neon figure tracks you; a small score read and a single coaching
+   cue surface only when there's something to say. Tap **⋯** for everything
+   else. Press **Stop** to release the camera.
 
 First load fetches the pose model from a CDN (a few seconds, one network call
 for the *model weights only* — never your video). After that it's all local.
@@ -51,12 +64,23 @@ the laptop's LAN address over https, or use a localhost tunnel.
 
 ### Controls
 
-- **Start / Stop** — turns the camera and analysis on/off.
-- **Flip side** — cycles `AUTO → LEFT → RIGHT`. Leave it on AUTO and it picks
-  whichever side of your body the camera sees more clearly. Override it if you
-  turn around to face the other way. (Switching resets the stroke stats, since
-  the geometry has changed.)
-- **Switch camera** — front/rear camera toggle.
+The main screen shows only **Start / Stop** and a single **⋯** menu. The menu
+slides up a sheet with everything else:
+
+- **Start / Stop** — turns the camera and analysis on/off (always visible).
+- **⋯ menu** — opens the sheet (always visible). Inside:
+  - **Recalibrate** — re-learn your normal stroke without ending the session.
+  - **Side: AUTO/LEFT/RIGHT** — cycles `AUTO → LEFT → RIGHT`. AUTO picks
+    whichever side of your body the camera sees more clearly. Override it if you
+    turn around. (Switching resets the stroke stats — the geometry changed.)
+  - **Switch camera** — front/rear camera toggle.
+  - **Show / Dim video** — lift or restore the dim scrim over the camera feed.
+  - **Save stroke** — pin your most recent stroke as the **ghost** to chase.
+  - **Replay best** — loop your ghost as a neon cartoon to study.
+  - **Ghost: ON/OFF** — overlay the ghost of your best stroke on your live figure.
+  - **View: Tron/Skeleton** — neon figure (default) or the raw pose skeleton.
+  - **Your progress**, the **Coach** panel, **Debug & telemetry**, and the
+    clear-data controls (history / ghost / **self-tuning**) all live here too.
 
 ---
 
@@ -155,6 +179,48 @@ colour-coded:
 
 Cues are held briefly so the panel reads steadily instead of flickering.
 
+> **Note:** the exact angles quoted above are the *cold-start defaults*. In
+> practice GHOST learns your normal stroke first, coaches relative to your own
+> baseline, and then tunes its own thresholds (below) — so what counts as
+> "off" is personalised, not a fixed number.
+
+### Self-calibration — learning *your* normal
+On Start, GHOST spends a couple of warm-up strokes settling, then ~12 strokes
+**learning your normal** (it shows a calm "learning your stroke" state, not
+faults). It records the median + a robust spread (from the median absolute
+deviation) of your catch/finish lean, knee range, drive/recovery timing, ratio,
+sequencing onset and stroke length. From then on every stroke is scored
+**0–100 against your own baseline**, and a deviation only counts when it's
+genuinely unlike *your* normal.
+
+### Self-optimisation — the coach sharpening *itself*
+This is the part that improves the **algorithm**, not you. GHOST keeps a rolling,
+capped record (numbers only) of your per-stroke deviations, sequencing onset,
+ghost-divergence, closeness and which faults fired — **across sessions** — and
+uses it to tune its own sensitivity:
+
+- **Auto-tuned thresholds.** Instead of fixed constants, the fault/deviation
+  thresholds are read off *your* accumulated distribution so faults fire at a
+  sensible **target rate** — roughly your worst ~15–20% of strokes (beyond about
+  your own 83rd percentile of deviation). If it's over-firing it tightens; if
+  it's gone silent it loosens. It converges on useful sensitivity on its own.
+- **Anti-drift.** Each tuned value is blended toward the data, **clamped to a
+  band around the original default** (its anchor), and **rate-limited** to a
+  small step per update — so it can self-correct but can never run away or
+  oscillate. Until enough strokes are gathered it simply uses the defaults.
+- **Confidence-aware.** GHOST watches how cleanly it can see you (landmark
+  visibility + how steady your stroke rhythm is). When confidence drops it
+  **widens its tolerance** and **softens or suppresses coaching** — showing a
+  quiet *"reading you…"* rather than emitting a guess from a poor read.
+- **Adapts as you improve.** Your best-stroke bar drifts slowly upward (anchored
+  and capped) as you row better, so the ghost keeps challenging you.
+
+A small **self-tuning** pip on screen shows it's learning itself and its current
+confidence. The full picture — the tuned thresholds, the accumulated
+distributions, the confidence model — is laid out in the **Debug & telemetry**
+panel (in the **⋯** menu) for inspection, and **Reset self-tuning** in the menu
+clears it back to the defaults.
+
 ---
 
 ## Privacy
@@ -164,8 +230,18 @@ Cues are held briefly so the panel reads steadily instead of flickering.
 - The only network requests are the one-time downloads of the MediaPipe library
   and the pose-model weights from a public CDN. **Your video is never sent
   anywhere.**
-- All stroke stats live in a single in-memory object and are gone on reload.
-- The on-screen badge — **"on-device · nothing saved"** — reflects this.
+- Per-frame analysis lives in a single in-memory object and is gone on reload.
+- What persists is **numbers only**, in this browser's `localStorage`:
+  - your learned **baseline** (medians + spreads of your stroke metrics),
+  - per-session **summaries** (date, duration, strokes, avg/best score, etc.),
+  - your **best-stroke shape** (the ghost — pose-normalised joint coordinates,
+    never pixels), and
+  - the **self-tuning** store (rolling, capped distributions of your deviations
+    + the thresholds the coach derived for itself).
+  None of it is video; none of it leaves the device. The menu has explicit
+  **Clear history / Clear ghost / Reset self-tuning** controls.
+- The on-screen badge — **"on-device · nothing saved"** — reflects that no video
+  is ever recorded, uploaded, or kept.
 
 ---
 
@@ -184,9 +260,10 @@ much:
 - **Cannot measure force, power, or watts.** It sees *shape and timing*, not
   load. It has no idea how hard you're pulling — only how you're sequencing and
   moving. Use it alongside your erg's monitor, not instead of it.
-- **It is not a physiotherapist or a qualified coach.** The thresholds are
-  sensible defaults for typical erg technique, not a personalised assessment.
-  Treat the cues as prompts to self-check, not medical or definitive advice.
+- **It is not a physiotherapist or a qualified coach.** It learns *your*
+  consistency and sequencing and tunes its own sensitivity, but it has no model
+  of correct technique beyond that — treat the cues as prompts to self-check,
+  not medical or definitive advice.
 - Stroke detection needs a few strokes to warm up before SPM, ratio, and
   consistency settle, and very slow or very erratic rowing can confuse the
   segmentation.

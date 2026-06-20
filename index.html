@@ -3,40 +3,46 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#070b10" />
-<title>Rowing Form Coach &middot; on-device</title>
+<meta name="theme-color" content="#1a1530" />
+<title>GHOST &middot; row your ghost</title>
 <style>
   /*
    * ======================================================================
-   *  Rowing Form Coach -- v2 styles
+   *  GHOST -- v4 styles  ("row your ghost")
    *  --------------------------------------------------------------------
-   *  Premium, calm, feedback-first. A high-end fitness-app aesthetic
-   *  (Whoop / Apple Fitness / Form): deep gradient base, ONE vibrant aqua
-   *  signature accent for "good", amber used sparingly, red rare. The HERO
-   *  is a circular quality RING the rower watches from ~2-3 m away. The raw
-   *  camera stays dimmed behind a scrim so the coaching read dominates.
+   *  GHOST is a single luminous art-piece, not a dashboard. A neon-teal
+   *  figure rows on a serene Monument-Valley dusk backdrop; you row to match
+   *  the ghost of your best self, and the coach quietly sharpens its OWN
+   *  analysis over time.
    *
-   *  Colour philosophy (the v1 "too much red/orange" fix): GOOD looks
-   *  gorgeous. The default, steady-state screen is aqua + ink, never alarm
-   *  colours. Amber appears only on a real one-off deviation; red only on a
-   *  repeated, calibrated fault.
+   *  Lean philosophy: the figure is the full-bleed HERO. Only ONE score read
+   *  and ONE coaching cue sit on the main screen; the cue fades when calm.
+   *  EVERYTHING else lives behind a single menu (the slide-up sheet). The
+   *  default, steady-state screen is calm + beautiful -- teal on dusk, never
+   *  alarm colours. Amber only on a real one-off deviation; red only on a
+   *  repeated, self-calibrated fault.
    * ======================================================================
    */
   :root {
-    /* Deep, rich base -- layered ink, not flat black. */
-    --bg-0: #070b10;
-    --bg-1: #0c121b;
-    --bg-2: #101926;
-    --panel: rgba(20, 28, 40, 0.72);
-    --panel-solid: #131c29;
-    --panel-2: rgba(28, 39, 55, 0.6);
-    --line: rgba(120, 150, 185, 0.16);
-    --line-soft: rgba(120, 150, 185, 0.09);
-    --text: #eef4fb;
-    --muted: #93a6bd;
-    --muted-2: #6f8298;
+    /* Monument-Valley dusk base -- muted indigo deepening to ink. */
+    --bg-0: #0d0a18;
+    --bg-1: #181232;
+    --bg-2: #241a44;
+    --panel: rgba(26, 21, 48, 0.78);
+    --panel-solid: #1a1530;
+    --panel-2: rgba(40, 32, 70, 0.6);
+    --line: rgba(150, 140, 200, 0.16);
+    --line-soft: rgba(150, 140, 200, 0.09);
+    --text: #f3eefb;
+    --muted: #b0a4cf;
+    --muted-2: #8478a8;
 
-    /* Signature palette: ONE vibrant accent for good/positive. */
+    /* MV accents (used in the backdrop + subtle chrome warmth). */
+    --mv-indigo: #2a2150;
+    --mv-rose:   #c98aa6;
+    --mv-peach:  #e6b08a;
+
+    /* Signature palette: ONE vibrant accent for good/positive (the ghost). */
     --aqua: #18e0c8;          /* electric teal -- the "good" hero colour     */
     --aqua-2: #34f5d6;        /* brighter aqua for ring highlights           */
     --aqua-deep: #0d8f81;
@@ -46,10 +52,10 @@
     --red: #ff6b6b;           /* RARE -- a repeated, calibrated fault         */
     --red-glow: rgba(255, 107, 107, 0.30);
     --skeleton: #66ecff;      /* crisp pose skeleton                          */
-    --ink-accent: #052b27;    /* text on aqua buttons                         */
+    --ink-accent: #04231f;    /* text on aqua buttons                         */
 
-    --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-    --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.30);
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.50);
+    --shadow-soft: 0 8px 28px rgba(0, 0, 0, 0.34);
     --radius: 20px;
     --radius-sm: 14px;
   }
@@ -58,9 +64,9 @@
   html, body { margin: 0; padding: 0; }
   body {
     background:
-      radial-gradient(1200px 800px at 78% -10%, rgba(24, 224, 200, 0.10), transparent 60%),
-      radial-gradient(900px 700px at 8% 108%, rgba(60, 120, 200, 0.10), transparent 55%),
-      linear-gradient(160deg, var(--bg-1) 0%, var(--bg-0) 55%, #05080c 100%);
+      radial-gradient(1100px 760px at 80% -12%, rgba(201, 138, 166, 0.10), transparent 60%),
+      radial-gradient(900px 720px at 12% 110%, rgba(56, 44, 110, 0.22), transparent 55%),
+      linear-gradient(165deg, var(--bg-1) 0%, var(--bg-0) 60%, #07060f 100%);
     background-attachment: fixed;
     color: var(--text);
     font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Text", Roboto, Helvetica, Arial, sans-serif;
@@ -70,47 +76,57 @@
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 16px 48px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 16px 16px 28px; }
 
-  /* ---- Header ---------------------------------------------------------- */
-  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
-  header h1 {
-    font-size: clamp(19px, 4.6vw, 26px); margin: 0;
-    font-weight: 800; letter-spacing: -0.02em; line-height: 1;
+  /* ---- Header: the GHOST wordmark (minimal neon-teal, letter-spaced) ---- */
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .wordmark { display: flex; align-items: baseline; gap: 11px; }
+  .wordmark h1 {
+    font-size: clamp(20px, 5.2vw, 30px); margin: 0;
+    font-weight: 600; line-height: 1;
+    letter-spacing: 0.40em;            /* spaced-out, tasteful -- not gaudy */
+    padding-left: 0.40em;              /* balance the trailing letter-spacing */
+    color: var(--aqua);
+    text-shadow: 0 0 18px rgba(24, 224, 200, 0.40), 0 0 2px rgba(24, 224, 200, 0.55);
   }
-  header h1 .accent {
-    background: linear-gradient(100deg, var(--aqua-2), var(--aqua));
-    -webkit-background-clip: text; background-clip: text; color: transparent;
+  .wordmark .tagline {
+    font-size: clamp(10px, 2.4vw, 12.5px); color: var(--muted-2);
+    letter-spacing: 0.16em; text-transform: lowercase; font-weight: 500; white-space: nowrap;
   }
   header .spacer { flex: 1 1 auto; }
 
   /* Privacy badge -- always visible, states the on-device guarantee. */
   .badge {
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; gap: 8px; align-self: center;
     background: var(--panel-2); border: 1px solid var(--line);
-    color: var(--aqua); padding: 7px 13px; border-radius: 999px;
-    font-size: 12.5px; font-weight: 700; white-space: nowrap;
+    color: var(--aqua); padding: 6px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; white-space: nowrap;
     backdrop-filter: blur(8px);
   }
   .badge .dot {
     width: 8px; height: 8px; border-radius: 50%; background: var(--aqua);
     box-shadow: 0 0 0 4px var(--aqua-glow);
   }
+  /* On short/landscape viewports the badge is tucked into the menu instead. */
+  @media (max-height: 560px) { header .badge { display: none; } }
 
-  /* ---- Layout ---------------------------------------------------------- */
-  .layout { display: grid; grid-template-columns: 1fr; gap: 18px; }
-  @media (min-width: 900px) {
-    .layout { grid-template-columns: minmax(0, 1.32fr) minmax(330px, 1fr); align-items: start; }
-  }
+  /* ---- Layout: a single full-bleed hero. No dashboard column. ---------- */
+  .layout { display: block; }
 
-  /* ---- Stage: video + overlay canvas + HUD ----------------------------- */
+  /* ---- Stage: the full-bleed art-piece (video + canvas + lean HUD) ----- */
   .stage {
     position: relative; width: 100%;
-    background: #04070b; border-radius: var(--radius); overflow: hidden;
+    background: #0d0a18; border-radius: var(--radius); overflow: hidden;
     border: 1px solid var(--line); box-shadow: var(--shadow);
     aspect-ratio: 4 / 3;
-    max-height: calc(100vh - 96px);
-    max-height: calc(100svh - 96px);   /* keep the whole stage + HUD on-screen (esp. landscape) */
+    /* Let the hero breathe: fill most of the viewport height. */
+    height: calc(100svh - 132px);
+    max-height: calc(100svh - 132px);
+    min-height: 360px;
+  }
+  /* Portrait phones: a touch taller-feeling hero. */
+  @media (max-width: 720px) {
+    .stage { aspect-ratio: auto; height: calc(100svh - 124px); }
   }
   .stage video, .stage canvas {
     position: absolute; inset: 0; width: 100%; height: 100%;
@@ -130,140 +146,118 @@
   .stage.running.dimvideo .scrim { display: block; }
   /* Mirror is applied in JS (front cameras) to video + canvas together. */
 
-  /* ---- HUD: the dominant on-video read --------------------------------- */
+  /* ---- LEAN HUD: only a minimal score read + one fading cue line ------- */
   .hud {
-    position: absolute; inset: 0; display: none; flex-direction: column;
-    justify-content: space-between; padding: clamp(10px, 2.4vw, 18px);
-    pointer-events: none; gap: 10px;
+    position: absolute; inset: 0; display: none;
+    padding: clamp(12px, 2.6vw, 22px);
+    pointer-events: none;
   }
-  .stage.running .hud { display: flex; }
+  .stage.running .hud, .stage.demo .hud { display: block; }
 
-  /* Top row: stroke rate + live phase chip */
-  .hud-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-  .glass {
-    background: rgba(8, 12, 18, 0.55); border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 14px; backdrop-filter: blur(10px);
+  /* Top-right: the minimal score read (small elegant ring). Integrated, not
+     a card. A single number lives in its centre. */
+  .score-read {
+    position: absolute; top: clamp(12px, 2.6vw, 22px); right: clamp(12px, 2.6vw, 22px);
+    width: clamp(72px, 15vw, 104px); aspect-ratio: 1/1;
   }
-  .hud-spm { padding: 6px 16px; text-align: center; }
-  .hud-spm b {
-    display: block; font-size: clamp(28px, 7.2vw, 52px); font-weight: 800; line-height: 1;
-    font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
-  }
-  .hud-spm small { font-size: clamp(9px, 2.2vw, 12px); color: var(--muted); letter-spacing: .18em; text-transform: uppercase; }
-  /* v3: the closeness-to-best "match best %" chip (centre of the top row). */
-  .hud-match { padding: 6px 14px; text-align: center; }
-  .hud-match b {
-    display: block; font-size: clamp(18px, 5vw, 30px); font-weight: 800; line-height: 1;
-    font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--aqua-2);
-  }
-  .hud-match small { font-size: clamp(8px, 1.9vw, 10.5px); color: var(--muted); letter-spacing: .14em; text-transform: uppercase; }
-  .hud-phase {
-    font-size: clamp(11px, 2.8vw, 16px); font-weight: 800; padding: 8px 14px; border-radius: 999px;
-    align-self: flex-start; letter-spacing: .10em; text-transform: uppercase; color: var(--muted);
-    display: inline-flex; align-items: center; gap: 8px;
-  }
-  .hud-phase .pdot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
-  .hud-phase.drive { color: var(--aqua); }
-  .hud-phase.recovery { color: #8fb4ff; }
-
-  /* ---- HERO: the quality RING (centrepiece) ---------------------------- */
-  .hud-hero { display: flex; flex-direction: column; align-items: center; gap: clamp(8px, 1.8vw, 14px); }
-  .ring-wrap {
-    position: relative; width: clamp(150px, 38vw, 230px); aspect-ratio: 1 / 1; max-height: 38vh;
-  }
-  .ring-wrap svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
-  .ring-track { fill: none; stroke: rgba(255,255,255,0.07); }
+  .score-read svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+  .ring-track { fill: none; stroke: rgba(255,255,255,0.08); }
   .ring-prog  { fill: none; stroke-linecap: round; transition: stroke-dashoffset .6s cubic-bezier(.22,.61,.36,1), stroke .5s ease; }
-  /* Gentle, NON-strobing breathing pulse on the good state only. */
   .ring-pulse {
-    position: absolute; inset: 8%; border-radius: 50%; pointer-events: none;
-    box-shadow: 0 0 38px 6px var(--aqua-glow); opacity: 0;
+    position: absolute; inset: 10%; border-radius: 50%; pointer-events: none;
+    box-shadow: 0 0 26px 3px var(--aqua-glow); opacity: 0;
     transition: opacity .6s ease;
   }
-  .ring-wrap.good .ring-pulse { opacity: 1; animation: breathe 3.8s ease-in-out infinite; }
-  @keyframes breathe { 0%,100% { transform: scale(0.97); opacity:.55; } 50% { transform: scale(1.02); opacity:.95; } }
+  .score-read.good .ring-pulse { opacity: 1; animation: breathe 3.8s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(0.97); opacity:.45; } 50% { transform: scale(1.03); opacity:.85; } }
   .ring-center {
     position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; text-align: center; gap: 1px;
+    align-items: center; justify-content: center; text-align: center; gap: 0;
   }
   .ring-score {
-    font-size: clamp(40px, 11vw, 72px); font-weight: 800; line-height: .92;
+    font-size: clamp(24px, 6vw, 38px); font-weight: 700; line-height: .94;
     font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
-    transition: color .5s ease;
+    transition: color .5s ease; color: var(--aqua);
   }
-  .ring-score .pt { font-size: 0.34em; font-weight: 700; color: var(--muted); margin-left: 2px; }
-  .ring-label { font-size: clamp(10px, 2.4vw, 13px); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
-
-  /* The single calm verdict line under the ring. */
-  .verdict-line {
-    text-align: center; font-weight: 750; line-height: 1.12;
-    font-size: clamp(17px, 4.4vw, 28px); padding: 9px 18px; border-radius: 16px;
-    max-width: 92%; transition: color .35s ease, background .35s ease;
-    background: rgba(8, 12, 18, 0.5); border: 1px solid rgba(255,255,255,0.05);
-    backdrop-filter: blur(8px);
+  .ring-score .pt { font-size: 0.42em; font-weight: 700; color: var(--muted); margin-left: 1px; }
+  .ring-label {
+    font-size: clamp(7px, 1.7vw, 9px); letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted-2); font-weight: 700; margin-top: 2px;
   }
-  .verdict-line .sub {
-    display: block; font-weight: 550; color: var(--muted);
-    font-size: clamp(11px, 2.7vw, 15px); margin-top: 4px; line-height: 1.25;
+  /* Calibration progress sits as a thin bar low-centre while learning. */
+  .calib {
+    position: absolute; left: 50%; bottom: clamp(70px, 16vw, 104px); transform: translateX(-50%);
+    display: none; flex-direction: column; align-items: center; gap: 7px; width: min(72%, 320px);
   }
-  .verdict-line.good { color: var(--aqua); }
-  .verdict-line.warn { color: var(--amber); }
-  .verdict-line.bad  { color: #fff; background: rgba(255, 107, 107, 0.16); border-color: rgba(255,107,107,.4); }
-  .verdict-line.bad .sub { color: rgba(255,255,255,.82); }
-  .verdict-line.learn { color: var(--aqua); }
-  .verdict-line.idle { color: var(--muted); font-weight: 650; }
-
-  /* Calibration progress (during the learning window). A calm, tasteful state. */
-  .calib { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
-  .calib-bar { width: min(78%, 360px); height: 8px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .calib.show { display: flex; }
+  .calib .clab { font-size: clamp(10px, 2.3vw, 12px); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+  .calib-bar { width: 100%; height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
   .calib-bar > i {
     display: block; height: 100%; width: 0%; border-radius: 999px;
     background: linear-gradient(90deg, var(--aqua-deep), var(--aqua-2));
     transition: width .5s ease;
   }
 
-  /* ---- Sequencing strip -- sleek segmented pill ------------------------ */
-  .hud-bottom { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-  .seq {
-    display: flex; align-items: stretch; gap: 4px; padding: 4px; border-radius: 14px;
-    background: rgba(8, 12, 18, 0.55); border: 1px solid rgba(255,255,255,0.06);
-    backdrop-filter: blur(10px); width: min(100%, 460px);
+  /* The single coaching cue line -- bottom-centre, appears only when there's
+     something to say, fades out when calm. */
+  .cue-line {
+    position: absolute; left: 50%; bottom: clamp(16px, 3.4vw, 30px); transform: translate(-50%, 8px);
+    text-align: center; font-weight: 650; line-height: 1.16;
+    font-size: clamp(16px, 4.2vw, 26px); padding: 10px 20px; border-radius: 16px;
+    max-width: min(90%, 560px); color: var(--text);
+    background: rgba(13, 10, 24, 0.46); border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(10px);
+    opacity: 0; visibility: hidden;
+    transition: opacity .5s ease, transform .5s ease, color .35s ease, background .35s ease;
   }
-  .seq .seg {
-    flex: 1 1 0; border-radius: 11px; padding: 7px 6px; text-align: center; min-width: 0;
-    background: rgba(255,255,255,0.03); border: 1px solid transparent;
-    transition: background .3s ease, border-color .3s ease, color .3s ease;
+  .cue-line.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+  .cue-line .sub {
+    display: block; font-weight: 500; color: var(--muted);
+    font-size: clamp(11px, 2.5vw, 14px); margin-top: 4px; line-height: 1.25;
   }
-  .seq .seg .lab { font-size: clamp(11px, 2.9vw, 16px); font-weight: 800; letter-spacing: .07em; line-height: 1.05; color: var(--muted); }
-  .seq .seg .ord { font-size: clamp(8.5px, 2vw, 11px); margin-top: 3px; text-transform: uppercase; letter-spacing: .05em; min-height: 1.05em; color: var(--muted-2); }
-  .seq .seg.ok   { background: rgba(24, 224, 200, 0.12); border-color: rgba(24,224,200,.35); }
-  .seq .seg.ok .lab, .seq .seg.ok .ord { color: var(--aqua); }
-  .seq .seg.warn { background: rgba(255, 194, 77, 0.14); border-color: rgba(255,194,77,.45); }
-  .seq .seg.warn .lab, .seq .seg.warn .ord { color: var(--amber); }
-  .seq .seg.bad  { background: rgba(255, 107, 107, 0.20); border-color: rgba(255,107,107,.5); }
-  .seq .seg.bad .lab, .seq .seg.bad .ord { color: #ffd2d2; }
-  .seq .arrow { align-self: center; color: var(--muted-2); font-size: clamp(12px, 3vw, 18px); font-weight: 700; padding: 0 1px; }
-  .stage:not(.running) .hud-hero, .stage:not(.running) .hud-bottom { visibility: hidden; }
+  .cue-line.good { color: var(--aqua); }
+  .cue-line.warn { color: var(--amber); }
+  .cue-line.bad  { color: #fff; background: rgba(255, 107, 107, 0.18); border-color: rgba(255,107,107,.42); }
+  .cue-line.bad .sub { color: rgba(255,255,255,.82); }
+  .cue-line.learn { color: var(--aqua); }
+  .cue-line.idle  { color: var(--muted); font-weight: 600; }
+  .cue-line.unsure { color: var(--muted); font-weight: 600; }
 
-  /* Trend dots: last strokes' verdicts, glanceable consistency read. */
-  .trend {
-    display: flex; gap: 7px; align-items: center; justify-content: center;
-    background: rgba(8, 12, 18, 0.5); border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 999px; padding: 6px 13px; backdrop-filter: blur(8px);
+  /* Self-tuning + confidence indicator -- small, calm, top-left. Says the
+     coach is learning ITSELF; dims when confidence is low. */
+  .selftune {
+    position: absolute; top: clamp(12px, 2.6vw, 22px); left: clamp(12px, 2.6vw, 22px);
+    display: none; align-items: center; gap: 8px;
+    background: rgba(13, 10, 24, 0.42); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 999px; padding: 6px 12px 6px 9px; backdrop-filter: blur(10px);
+    pointer-events: none;
   }
-  .trend .tlab { font-size: clamp(8.5px, 2vw, 11px); color: var(--muted-2); text-transform: uppercase; letter-spacing: .14em; margin-right: 3px; }
-  .trend .tdot { width: clamp(9px, 2.4vw, 13px); height: clamp(9px, 2.4vw, 13px); border-radius: 50%; background: rgba(255,255,255,.12); transition: background .3s ease; }
-  .trend .tdot.good { background: var(--aqua); box-shadow: 0 0 8px var(--aqua-glow); }
-  .trend .tdot.warn { background: var(--amber); }
-  .trend .tdot.bad  { background: var(--red); }
+  .stage.running .selftune, .stage.demo .selftune { display: inline-flex; }
+  .selftune .stdot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--aqua);
+    box-shadow: 0 0 0 4px var(--aqua-glow);
+    animation: tunepulse 4.2s ease-in-out infinite;
+  }
+  @keyframes tunepulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .selftune .sttext {
+    font-size: clamp(9px, 2vw, 11px); color: var(--muted); letter-spacing: .06em; font-weight: 600; white-space: nowrap;
+  }
+  .selftune .stconf {
+    font-variant-numeric: tabular-nums; color: var(--aqua); font-weight: 700;
+  }
+  /* Low confidence: desaturate the pip + soften the copy colour. */
+  .selftune.lowconf .stdot { background: var(--muted-2); box-shadow: 0 0 0 4px rgba(132,120,168,.25); }
+  .selftune.lowconf .stconf { color: var(--muted); }
 
-  /* Short viewports (landscape phones): trim chrome so stage + HUD fit. */
+  .stage:not(.running):not(.demo) .score-read,
+  .stage:not(.running):not(.demo) .calib { display: none; }
+
+  /* Short viewports (landscape phones): trim chrome so the hero fills. */
   @media (max-height: 560px) {
-    .wrap { padding: 8px 12px 18px; }
-    header { margin-bottom: 8px; }
-    .hud { gap: 6px; padding: 9px; }
-    .ring-wrap { width: clamp(120px, 26vh, 180px); max-height: 30vh; }
-    .verdict-line { padding: 6px 14px; }
+    .wrap { padding: 8px 12px 14px; }
+    header { margin-bottom: 6px; }
+    .stage { height: calc(100svh - 86px); max-height: calc(100svh - 86px); }
+    .cue-line { font-size: clamp(14px, 3.4vh, 22px); padding: 7px 16px; }
   }
 
   /* ---- Status overlay (load / error / setup hints) --------------------- */
@@ -376,12 +370,11 @@
   .prog-actions { display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
   .prog-note { color: var(--muted-2); font-size: 11.5px; flex: 1 1 140px; }
 
-  /* ---- Controls -------------------------------------------------------- */
-  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  /* ---- Buttons (shared) ------------------------------------------------ */
   button {
     appearance: none; border: 1px solid var(--line); background: var(--panel-2);
     color: var(--text); font: inherit; font-weight: 700; padding: 12px 16px;
-    border-radius: 13px; cursor: pointer; flex: 1 1 auto; min-height: 48px;
+    border-radius: 13px; cursor: pointer; min-height: 48px;
     transition: background .18s ease, border-color .18s ease, opacity .18s ease, transform .08s ease;
     backdrop-filter: blur(8px);
   }
@@ -393,28 +386,76 @@
     box-shadow: 0 8px 24px rgba(24, 224, 200, 0.22);
   }
   button.primary.stop { background: linear-gradient(100deg, #ff8a8a, var(--red)); color: #350707; box-shadow: 0 8px 24px rgba(255,107,107,.22); }
-  button.ghost { flex: 0 0 auto; font-size: 13px; padding: 10px 14px; min-height: 42px; font-weight: 650; }
-  /* v3: an "active" toggle state (Tron view on, ghost on, replaying). */
+  button.ghost { font-size: 13px; padding: 10px 14px; min-height: 42px; font-weight: 650; }
+  /* "active" toggle state (Tron view on, ghost on, replaying). */
   button.active {
     border-color: rgba(24,224,200,.55); color: var(--aqua);
     background: rgba(24,224,200,.10);
     box-shadow: inset 0 0 0 1px rgba(24,224,200,.25);
   }
-  /* The kinetic-loop control row sits just under the primary controls. */
-  .controls-kinetic { margin-top: 10px; }
 
-  .hint { color: var(--muted); font-size: 12.5px; margin-top: 13px; line-height: 1.5; }
+  /* ---- The ONLY always-visible controls: Start/Stop + the menu button -- */
+  .dock { display: flex; gap: 10px; margin-top: 12px; align-items: stretch; }
+  .dock #startBtn { flex: 1 1 auto; font-size: 16px; }
+  .dock .menu-btn {
+    flex: 0 0 auto; width: 54px; min-height: 48px; font-size: 22px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .dock .menu-btn.active { /* sheet open */ border-color: var(--aqua); color: var(--aqua); }
+
+  /* ---- Slide-up sheet: EVERYTHING else lives here ---------------------- */
+  .sheet-scrim {
+    position: fixed; inset: 0; background: rgba(7, 6, 15, 0.55);
+    opacity: 0; visibility: hidden; transition: opacity .28s ease; z-index: 40;
+    backdrop-filter: blur(2px);
+  }
+  .sheet-scrim.open { opacity: 1; visibility: visible; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 41;
+    max-height: 86svh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: linear-gradient(180deg, var(--bg-2), var(--bg-1));
+    border-top: 1px solid var(--line); border-radius: 22px 22px 0 0;
+    box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+    padding: 10px 16px calc(22px + env(safe-area-inset-bottom));
+    transform: translateY(102%); transition: transform .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .sheet.open { transform: translateY(0); }
+  @media (min-width: 760px) {
+    /* On wide screens the sheet is a centred panel, not full-width. */
+    .sheet { left: 50%; right: auto; width: min(560px, 94vw); transform: translate(-50%, 102%); border-radius: 22px; bottom: 16px; }
+    .sheet.open { transform: translate(-50%, 0); }
+  }
+  .sheet .grip { width: 42px; height: 5px; border-radius: 999px; background: var(--line); margin: 4px auto 12px; }
+  .sheet-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 14px; }
+  .sheet-head h2 { margin: 0; font-size: 15px; font-weight: 750; letter-spacing: .01em; }
+  .sheet-head .sub { font-size: 12px; color: var(--muted-2); }
+  .sheet-head .close { margin-left: auto; min-height: 36px; padding: 6px 12px; font-size: 13px; font-weight: 650; }
+
+  .sheet h3 {
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+    margin: 16px 0 9px; font-weight: 700;
+  }
+  /* Control grids inside the sheet. */
+  .sheet-controls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .sheet-controls button { width: 100%; }
+  .sheet-controls .span2 { grid-column: 1 / -1; }
+
+  .hint { color: var(--muted); font-size: 12.5px; margin: 14px 0 2px; line-height: 1.5; }
   .hint code { background: var(--panel-2); padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); }
   .hint strong { color: var(--text); }
 
-  footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.6; }
+  /* Panels inside the sheet (coach + progress live here now). */
+  .panel { background: transparent; border: 0; padding: 0; box-shadow: none; }
+  .panel + .panel { margin-top: 18px; }
+
+  footer { color: var(--muted); font-size: 12px; margin-top: 16px; line-height: 1.6; }
   footer strong { color: var(--text); }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 9px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 12px; height: 4px; border-radius: 3px; display: inline-block; }
 
-  /* ---- Debug / telemetry panel ----------------------------------------- */
-  .debug { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius);
+  /* ---- Debug / telemetry panel (inside the sheet) ---------------------- */
+  .debug { margin-top: 16px; border: 1px solid var(--line); border-radius: var(--radius-sm);
            background: var(--panel); overflow: hidden; backdrop-filter: blur(14px); }
   .debug > summary {
     cursor: pointer; list-style: none; padding: 14px 16px; font-weight: 700; font-size: 13.5px;
@@ -449,11 +490,13 @@
   .debug-actions { display: flex; gap: 10px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
   .debug-note { color: var(--muted-2); font-size: 11.5px; }
 
-  /* Respect reduced-motion: kill the pulse + smooth-but-not-animated. */
+  /* Respect reduced-motion: kill the pulses + smooth-but-not-animated. */
   @media (prefers-reduced-motion: reduce) {
-    .ring-wrap.good .ring-pulse { animation: none; }
+    .score-read.good .ring-pulse { animation: none; }
+    .selftune .stdot { animation: none; }
     .ring-prog { transition: none; }
     .overlay .spinner { animation-duration: 1.6s; }
+    .sheet, .sheet-scrim, .cue-line { transition: none; }
     * { scroll-behavior: auto !important; }
   }
 </style>
@@ -461,296 +504,354 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Rowing <span class="accent">Form Coach</span></h1>
+    <div class="wordmark">
+      <h1>GHOST</h1>
+      <span class="tagline">row your ghost</span>
+    </div>
     <div class="spacer"></div>
     <div class="badge"><span class="dot"></span> on-device &middot; nothing saved</div>
   </header>
 
   <div class="layout">
-    <!-- ============================ STAGE ============================ -->
-    <div>
-      <!-- dimvideo = feedback-first (scrim + dimmed video). "Show video" lifts it. -->
-      <div class="stage dimvideo" id="stage">
-        <!-- muted + playsinline required for autoplay on iOS Safari -->
-        <video id="video" playsinline muted></video>
-        <canvas id="canvas"></canvas>
-        <div class="scrim"></div>
+    <!-- ===================== THE FULL-BLEED HERO ===================== -->
+    <!-- dimvideo = the opaque Monument-Valley dusk stage. "Show video" lifts it. -->
+    <div class="stage dimvideo" id="stage">
+      <!-- muted + playsinline required for autoplay on iOS Safari -->
+      <video id="video" playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="scrim"></div>
 
-        <div class="hud" id="hud">
-          <!-- Top: stroke rate + match-to-best + live phase -->
-          <div class="hud-top">
-            <div class="hud-spm glass"><b id="hudSpm">&ndash;</b><small>spm</small></div>
-            <!-- v3 closeness-to-best ("match %") -- the goal-directed improvement read.
-                 Hidden until a reference + a score exist. -->
-            <div class="hud-match glass" id="hudMatch" style="display:none;">
-              <b id="hudMatchVal">&ndash;</b><small>match best</small>
-            </div>
-            <div class="hud-phase glass" id="hudPhase"><span class="pdot"></span>READY</div>
-          </div>
+      <div class="hud" id="hud">
+        <!-- Self-tuning + confidence pip (the coach learning itself). -->
+        <div class="selftune" id="selftune" title="GHOST is tuning its own analysis to you">
+          <span class="stdot"></span>
+          <span class="sttext"><span id="stLabel">self-tuning</span> &middot; <span class="stconf" id="stConf">--</span></span>
+        </div>
 
-          <!-- HERO: the quality ring + the single calm verdict -->
-          <div class="hud-hero">
-            <div class="ring-wrap" id="ringWrap">
-              <svg viewBox="0 0 120 120" aria-hidden="true">
-                <circle class="ring-track" cx="60" cy="60" r="52" stroke-width="9"></circle>
-                <circle class="ring-prog" id="ringProg" cx="60" cy="60" r="52" stroke-width="9"
-                        stroke="var(--aqua)" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
-              </svg>
-              <div class="ring-pulse"></div>
-              <div class="ring-center">
-                <div class="ring-score" id="ringScore">&ndash;</div>
-                <div class="ring-label" id="ringLabel">form score</div>
-              </div>
-            </div>
-
-            <!-- Calibration progress (shown only while learning) -->
-            <div class="calib" id="calib" style="display:none;">
-              <div class="calib-bar"><i id="calibBar"></i></div>
-            </div>
-
-            <!-- The single calm verdict line -->
-            <div class="verdict-line idle" id="hudCue">Start rowing<span class="sub" id="hudCueSub"></span></div>
-          </div>
-
-          <!-- Bottom: sequencing strip + trend dots -->
-          <div class="hud-bottom">
-            <div class="seq" id="seqStrip">
-              <div class="seg" id="segLegs"><div class="lab">LEGS</div><div class="ord" id="ordLegs"></div></div>
-              <div class="arrow">&rsaquo;</div>
-              <div class="seg" id="segBody"><div class="lab">BODY</div><div class="ord" id="ordBody"></div></div>
-              <div class="arrow">&rsaquo;</div>
-              <div class="seg" id="segArms"><div class="lab">ARMS</div><div class="ord" id="ordArms"></div></div>
-            </div>
-            <div class="trend" id="trend">
-              <span class="tlab">last</span>
-              <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
-              <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
-            </div>
+        <!-- The ONE score read: a small, elegant ring with a single number. -->
+        <div class="score-read" id="ringWrap">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ring-track" cx="60" cy="60" r="52" stroke-width="8"></circle>
+            <circle class="ring-prog" id="ringProg" cx="60" cy="60" r="52" stroke-width="8"
+                    stroke="var(--aqua)" stroke-dasharray="326.7" stroke-dashoffset="326.7"></circle>
+          </svg>
+          <div class="ring-pulse"></div>
+          <div class="ring-center">
+            <div class="ring-score" id="ringScore">&ndash;</div>
+            <div class="ring-label" id="ringLabel">form</div>
           </div>
         </div>
 
-        <div class="overlay" id="overlay">
-          <div class="card">
-            <h3 id="ovTitle">On-device rowing coach</h3>
-            <p id="ovText">Press Start, allow the camera, and sit side-on with your whole body in frame.</p>
-          </div>
+        <!-- Calibration progress (thin bar, only while learning). -->
+        <div class="calib" id="calib">
+          <div class="clab" id="calibLabel">learning your stroke</div>
+          <div class="calib-bar"><i id="calibBar"></i></div>
+        </div>
+
+        <!-- The ONE coaching cue line: appears only when there's something to say. -->
+        <div class="cue-line idle" id="hudCue">Start rowing<span class="sub" id="hudCueSub"></span></div>
+      </div>
+
+      <!-- Status overlay: hidden by default (the idle preview + cue line carry the
+           "press Start" message). Surfaces only for loading / errors / stopped. -->
+      <div class="overlay hidden" id="overlay">
+        <div class="card">
+          <h3 id="ovTitle">GHOST</h3>
+          <p id="ovText">Press Start, allow the camera, and sit side-on with your whole body in frame. Row your ghost.</p>
         </div>
       </div>
-
-      <div class="controls">
-        <button id="startBtn" class="primary">Start</button>
-        <button id="recalibBtn" class="ghost" disabled title="Re-learn your normal stroke">Recalibrate</button>
-        <button id="flipSideBtn" disabled title="Use when you face the other way">Side: AUTO</button>
-        <button id="cameraBtn" disabled title="Switch front / rear camera">Switch camera</button>
-        <button id="videoToggleBtn" class="ghost" title="Show or dim the camera feed">Show video</button>
-      </div>
-
-      <!-- v3: the kinetic improvement loop controls (capture / replay / ghost / view) -->
-      <div class="controls controls-kinetic">
-        <button id="saveStrokeBtn" class="ghost" disabled title="Pin the last stroke as your reference to beat">Save stroke</button>
-        <button id="replayBtn" class="ghost" disabled title="Replay your best stroke as a Tron cartoon">Replay best</button>
-        <button id="ghostBtn" class="ghost" title="Overlay your best stroke as a ghost to optimise against">Ghost: ON</button>
-        <button id="viewBtn" class="ghost" title="Switch between the neon figure and the raw skeleton">View: Tron</button>
-      </div>
-
-      <p class="hint">
-        Tip: prop your phone or laptop side-on, ~2&ndash;3&nbsp;m away, so the camera sees your
-        whole body from the side (head to feet). On Start it spends about a dozen strokes
-        <strong>learning your normal</strong> &mdash; then it scores you against yourself. The feed
-        is dimmed so the read stands out; tap <strong>Show video</strong> to check framing.
-      </p>
     </div>
 
-    <!-- ========================= RIGHT COLUMN ========================= -->
-    <div>
-      <!-- COACH PANEL -->
-      <div class="panel">
-        <h2>This stroke <span class="pill" id="coachPill">calm</span></h2>
-        <div class="cue idle" id="cue">
-          <div class="cue-label">Coaching</div>
-          <div class="cue-text" id="cueText">Waiting to start&hellip;</div>
-          <div class="cue-sub" id="cueSub">It learns your stroke first, then coaches against your baseline.</div>
-        </div>
-
-        <div class="metrics">
-          <div class="metric">
-            <div class="k">Stroke rate</div>
-            <div class="v"><span id="mSpm">&ndash;</span> <span class="u">spm</span></div>
-          </div>
-          <div class="metric">
-            <div class="k">Drive : Recovery</div>
-            <div class="v"><span id="mRatio">&ndash;</span></div>
-          </div>
-          <div class="metric">
-            <div class="k">Body lean</div>
-            <div class="v"><span id="mLean">&ndash;</span><span class="u">&deg;</span></div>
-          </div>
-          <div class="metric">
-            <div class="k">Knee angle</div>
-            <div class="v"><span id="mKnee">&ndash;</span><span class="u">&deg;</span></div>
-          </div>
-          <div class="metric span2">
-            <div class="k">Consistency vs your baseline (last 5)</div>
-            <div class="v"><span id="mConsist">&ndash;</span><span class="u">%</span></div>
-            <div class="bar"><i id="consistBar"></i></div>
-          </div>
-          <!-- v3: closeness-to-best (trajectory match %). Goal-directed signal. -->
-          <div class="metric span2">
-            <div class="k">Match to your best stroke <span id="refTag" class="ref-tag">no reference yet</span></div>
-            <div class="v"><span id="mMatch">&ndash;</span><span class="u">%</span></div>
-            <div class="bar"><i id="matchBar"></i></div>
-          </div>
-          <div class="metric span2">
-            <div class="k">Phase &middot; total strokes</div>
-            <div class="v" style="display:flex;align-items:center;gap:10px;">
-              <span class="phase-pill" id="phasePill">&ndash;</span>
-              <span id="mStrokes" style="font-size:18px;">0</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- PROGRESS PANEL -->
-      <div class="panel">
-        <h2>Your progress <span class="pill" id="progPill">on-device</span></h2>
-        <div class="prog-grid">
-          <div class="prog-cell">
-            <div class="pk">This session</div>
-            <div class="pv" id="pgNow">&ndash;</div>
-            <div class="pd" id="pgNowD">avg score</div>
-          </div>
-          <div class="prog-cell">
-            <div class="pk">Last session</div>
-            <div class="pv" id="pgLast">&ndash;</div>
-            <div class="pd" id="pgLastD">&mdash;</div>
-          </div>
-          <div class="prog-cell">
-            <div class="pk">Personal best</div>
-            <div class="pv" id="pgBest">&ndash;</div>
-            <div class="pd" id="pgBestD">&mdash;</div>
-          </div>
-        </div>
-
-        <div class="spark-wrap" id="sparkWrap">
-          <div class="sl">Avg score &middot; recent sessions <span class="cnt" id="sparkCnt"></span></div>
-          <svg class="spark" id="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="rgba(24,224,200,0.35)"/>
-                <stop offset="100%" stop-color="rgba(24,224,200,0.02)"/>
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <div class="prog-empty" id="progEmpty">
-          No past sessions yet. Finish a session and your summary lands here &mdash;
-          <strong>numbers only, on this device</strong>, never any video.
-        </div>
-
-        <div class="prog-actions">
-          <button id="clearHistBtn" class="ghost">Clear history</button>
-          <button id="clearRefBtn" class="ghost">Clear best stroke</button>
-          <span class="prog-note" id="histNote">Stores per-session summaries + your best-stroke shape (numbers only) locally on this device. No video, ever.</span>
-        </div>
-      </div>
-
-      <footer>
-        <strong>How it reads you:</strong> it auto-picks your more-visible side, measures
-        trunk lean, knee angle and your hip sliding back-and-forth to split each stroke into
-        Drive and Recovery. On Start it spends ~12 strokes <strong>learning your normal</strong>,
-        then every stroke gets <strong>one steady score</strong> against your own baseline.
-        Calm by default &mdash; amber only on a real, repeated drift; red is rare.
-        <div class="legend">
-          <span><i style="background:var(--skeleton)"></i> skeleton</span>
-          <span><i style="background:var(--aqua)"></i> dialled in</span>
-          <span><i style="background:var(--amber)"></i> drifting</span>
-          <span><i style="background:var(--red)"></i> repeated fault</span>
-        </div>
-      </footer>
-
-      <!-- ===================== DEBUG / TELEMETRY ===================== -->
-      <details class="debug" id="debug">
-        <summary>Debug &amp; telemetry<span class="tag">raw numbers</span></summary>
-        <div class="debug-body">
-          <h4>Live (per frame)</h4>
-          <div class="live" id="live">
-            <div class="lv"><span class="lk">Side</span><span class="lvv" id="dvSide">&ndash;</span></div>
-            <div class="lv"><span class="lk">Phase</span><span class="lvv" id="dvPhase">&ndash;</span></div>
-            <div class="lv"><span class="lk">Vis OK</span><span class="lvv" id="dvVis">&ndash;</span></div>
-            <div class="lv"><span class="lk">Trunk lean&deg;</span><span class="lvv" id="dvLean">&ndash;</span></div>
-            <div class="lv"><span class="lk">Knee&deg;</span><span class="lvv" id="dvKnee">&ndash;</span></div>
-            <div class="lv"><span class="lk">Leg ext 0-1</span><span class="lvv" id="dvLegExt">&ndash;</span></div>
-            <div class="lv"><span class="lk">legProgress</span><span class="lvv" id="dvLegProg">&ndash;</span></div>
-            <div class="lv"><span class="lk">backOpening&deg;</span><span class="lvv" id="dvBackOpen">&ndash;</span></div>
-            <div class="lv"><span class="lk">phase / state</span><span class="lvv" id="dvState">&ndash;</span></div>
-            <div class="lv"><span class="lk">match best %</span><span class="lvv" id="dvMatch">&ndash;</span></div>
-            <div class="lv"><span class="lk">last match %</span><span class="lvv" id="dvLastMatch">&ndash;</span></div>
-            <div class="lv"><span class="lk">capture frames</span><span class="lvv" id="dvFrames">&ndash;</span></div>
-          </div>
-
-          <h4>Reference (your best stroke)</h4>
-          <div class="live" id="refLive">
-            <div class="lv"><span class="lk">Source</span><span class="lvv" id="rvSource">&ndash;</span></div>
-            <div class="lv"><span class="lk">Ref score</span><span class="lvv" id="rvScore">&ndash;</span></div>
-            <div class="lv"><span class="lk">Ref spm</span><span class="lvv" id="rvSpm">&ndash;</span></div>
-            <div class="lv"><span class="lk">Ref side</span><span class="lvv" id="rvSide">&ndash;</span></div>
-            <div class="lv"><span class="lk">Traj steps</span><span class="lvv" id="rvN">&ndash;</span></div>
-            <div class="lv"><span class="lk">Drive frac</span><span class="lvv" id="rvDrive">&ndash;</span></div>
-          </div>
-
-          <h4>Learned baseline (your normal)</h4>
-          <div class="live" id="baseLive">
-            <div class="lv"><span class="lk">Status</span><span class="lvv" id="bvStatus">&ndash;</span></div>
-            <div class="lv"><span class="lk">Catch lean</span><span class="lvv" id="bvCatchLean">&ndash;</span></div>
-            <div class="lv"><span class="lk">Finish lean</span><span class="lvv" id="bvFinishLean">&ndash;</span></div>
-            <div class="lv"><span class="lk">Knee min</span><span class="lvv" id="bvKneeMin">&ndash;</span></div>
-            <div class="lv"><span class="lk">Knee max</span><span class="lvv" id="bvKneeMax">&ndash;</span></div>
-            <div class="lv"><span class="lk">Drive s</span><span class="lvv" id="bvDrive">&ndash;</span></div>
-            <div class="lv"><span class="lk">Recovery s</span><span class="lvv" id="bvRecovery">&ndash;</span></div>
-            <div class="lv"><span class="lk">Ratio</span><span class="lvv" id="bvRatio">&ndash;</span></div>
-            <div class="lv"><span class="lk">Seq onset (leg%)</span><span class="lvv" id="bvSeqOnset">&ndash;</span></div>
-          </div>
-
-          <h4>Per-stroke log (last 12)</h4>
-          <div class="logwrap">
-            <table class="log">
-              <thead>
-                <tr>
-                  <th>#</th><th>spm</th><th>drv s</th><th>rec s</th><th>ratio</th>
-                  <th>catch&deg;</th><th>min knee&deg;</th><th>dev &sigma;</th><th>score</th><th>match%</th><th>flag</th><th>verdict</th>
-                </tr>
-              </thead>
-              <tbody id="logBody">
-                <tr><td colspan="12" class="log-empty">No strokes logged yet &mdash; start rowing.</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="debug-actions">
-            <button id="copyLogBtn" class="ghost">Copy log (JSON)</button>
-            <span class="debug-note" id="copyNote">Copies the per-stroke log + learned baseline so you can paste it back.</span>
-          </div>
-        </div>
-      </details>
+    <!-- The ONLY always-visible controls: Start/Stop + a single menu. -->
+    <div class="dock">
+      <button id="startBtn" class="primary">Start</button>
+      <button id="menuBtn" class="menu-btn" aria-label="Menu" title="Controls, progress &amp; settings">&#8943;</button>
     </div>
   </div>
 </div>
 
+<!-- ===================== THE SLIDE-UP SHEET ===================== -->
+<!-- Everything that is NOT the hero / score / cue lives behind the one menu. -->
+<div class="sheet-scrim" id="sheetScrim"></div>
+<aside class="sheet" id="sheet" aria-hidden="true">
+  <div class="grip"></div>
+  <div class="sheet-head">
+    <h2>GHOST</h2>
+    <span class="sub">row your ghost</span>
+    <button class="close" id="sheetClose">Done</button>
+  </div>
+
+  <!-- Session controls -->
+  <h3>Session</h3>
+  <div class="sheet-controls">
+    <button id="recalibBtn" class="ghost" disabled title="Re-learn your normal stroke">Recalibrate</button>
+    <button id="flipSideBtn" disabled title="Use when you face the other way">Side: AUTO</button>
+    <button id="cameraBtn" disabled title="Switch front / rear camera">Switch camera</button>
+    <button id="videoToggleBtn" class="ghost" title="Show or dim the camera feed">Show video</button>
+  </div>
+
+  <!-- The ghost / kinetic loop -->
+  <h3>Your ghost</h3>
+  <div class="sheet-controls">
+    <button id="saveStrokeBtn" class="ghost" disabled title="Pin the last stroke as your reference to beat">Save stroke</button>
+    <button id="replayBtn" class="ghost" disabled title="Replay your best stroke">Replay best</button>
+    <button id="ghostBtn" class="ghost" title="Overlay the ghost of your best stroke">Ghost: ON</button>
+    <button id="viewBtn" class="ghost" title="Switch between the neon figure and the raw skeleton">View: Tron</button>
+  </div>
+
+  <p class="hint">
+    Prop your phone side-on, ~2&ndash;3&nbsp;m away, whole body in frame. GHOST spends a dozen strokes
+    learning your normal, then coaches you against yourself &mdash; and quietly tunes its own
+    sensitivity to you as you go.
+  </p>
+
+  <!-- COACH PANEL (now tucked away) -->
+  <div class="panel">
+    <h2 style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:18px 0 12px;font-weight:700;display:flex;align-items:center;gap:8px;">
+      This stroke <span class="pill" id="coachPill">calm</span>
+    </h2>
+    <div class="cue idle" id="cue">
+      <div class="cue-label">Coaching</div>
+      <div class="cue-text" id="cueText">Waiting to start&hellip;</div>
+      <div class="cue-sub" id="cueSub">It learns your stroke first, then coaches against your baseline.</div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="k">Stroke rate</div>
+        <div class="v"><span id="mSpm">&ndash;</span> <span class="u">spm</span></div>
+      </div>
+      <div class="metric">
+        <div class="k">Drive : Recovery</div>
+        <div class="v"><span id="mRatio">&ndash;</span></div>
+      </div>
+      <div class="metric">
+        <div class="k">Body lean</div>
+        <div class="v"><span id="mLean">&ndash;</span><span class="u">&deg;</span></div>
+      </div>
+      <div class="metric">
+        <div class="k">Knee angle</div>
+        <div class="v"><span id="mKnee">&ndash;</span><span class="u">&deg;</span></div>
+      </div>
+      <div class="metric span2">
+        <div class="k">Consistency vs your baseline (last 5)</div>
+        <div class="v"><span id="mConsist">&ndash;</span><span class="u">%</span></div>
+        <div class="bar"><i id="consistBar"></i></div>
+      </div>
+      <!-- closeness-to-best (trajectory match %). Goal-directed signal. -->
+      <div class="metric span2">
+        <div class="k">Match to your ghost <span id="refTag" class="ref-tag">no reference yet</span></div>
+        <div class="v"><span id="mMatch">&ndash;</span><span class="u">%</span></div>
+        <div class="bar"><i id="matchBar"></i></div>
+      </div>
+      <div class="metric span2">
+        <div class="k">Sequencing &middot; phase &middot; total strokes</div>
+        <div class="v" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="seq" id="seqStrip" style="display:inline-flex;width:auto;flex:0 0 auto;">
+            <span class="seg" id="segLegs"><span class="lab">LEGS</span><span class="ord" id="ordLegs"></span></span>
+            <span class="arrow">&rsaquo;</span>
+            <span class="seg" id="segBody"><span class="lab">BODY</span><span class="ord" id="ordBody"></span></span>
+            <span class="arrow">&rsaquo;</span>
+            <span class="seg" id="segArms"><span class="lab">ARMS</span><span class="ord" id="ordArms"></span></span>
+          </span>
+          <span class="phase-pill" id="phasePill">&ndash;</span>
+          <span id="mStrokes" style="font-size:18px;">0</span>
+          <span class="trend" id="trend" style="margin-left:auto;">
+            <span class="tlab">last</span>
+            <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+            <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS PANEL -->
+  <div class="panel">
+    <h2 style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:18px 0 12px;font-weight:700;display:flex;align-items:center;gap:8px;">
+      Your progress <span class="pill" id="progPill">on-device</span>
+    </h2>
+    <div class="prog-grid">
+      <div class="prog-cell">
+        <div class="pk">This session</div>
+        <div class="pv" id="pgNow">&ndash;</div>
+        <div class="pd" id="pgNowD">avg score</div>
+      </div>
+      <div class="prog-cell">
+        <div class="pk">Last session</div>
+        <div class="pv" id="pgLast">&ndash;</div>
+        <div class="pd" id="pgLastD">&mdash;</div>
+      </div>
+      <div class="prog-cell">
+        <div class="pk">Personal best</div>
+        <div class="pv" id="pgBest">&ndash;</div>
+        <div class="pd" id="pgBestD">&mdash;</div>
+      </div>
+    </div>
+
+    <div class="spark-wrap" id="sparkWrap">
+      <div class="sl">Avg score &middot; recent sessions <span class="cnt" id="sparkCnt"></span></div>
+      <svg class="spark" id="spark" viewBox="0 0 300 56" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="rgba(24,224,200,0.35)"/>
+            <stop offset="100%" stop-color="rgba(24,224,200,0.02)"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="prog-empty" id="progEmpty">
+      No past sessions yet. Finish a session and your summary lands here &mdash;
+      <strong>numbers only, on this device</strong>, never any video.
+    </div>
+
+    <div class="prog-actions">
+      <button id="clearHistBtn" class="ghost">Clear history</button>
+      <button id="clearRefBtn" class="ghost">Clear ghost</button>
+      <button id="clearTuneBtn" class="ghost">Reset self-tuning</button>
+      <span class="prog-note" id="histNote">Stores per-session summaries, your best-stroke shape, and what the coach has learned about its own sensitivity (numbers only) on this device. No video, ever.</span>
+    </div>
+  </div>
+
+  <footer>
+    <strong>How GHOST reads you:</strong> it auto-picks your more-visible side, measures
+    trunk lean, knee angle and your hip sliding back-and-forth to split each stroke into
+    Drive and Recovery. On Start it spends ~12 strokes <strong>learning your normal</strong>,
+    then every stroke gets <strong>one steady score</strong> against your own baseline. It also
+    <strong>tunes its own thresholds</strong> from your accumulated strokes so it flags only your
+    genuinely off strokes &mdash; and softens when it&rsquo;s unsure it&rsquo;s reading you cleanly.
+    Calm by default &mdash; amber only on a real, repeated drift; red is rare.
+    <div class="legend">
+      <span><i style="background:var(--skeleton)"></i> skeleton</span>
+      <span><i style="background:var(--aqua)"></i> dialled in</span>
+      <span><i style="background:var(--amber)"></i> drifting</span>
+      <span><i style="background:var(--red)"></i> repeated fault</span>
+    </div>
+  </footer>
+
+  <!-- ===================== DEBUG / TELEMETRY ===================== -->
+  <details class="debug" id="debug">
+    <summary>Debug &amp; telemetry<span class="tag">raw numbers</span></summary>
+    <div class="debug-body">
+      <h4>Live (per frame)</h4>
+      <div class="live" id="live">
+        <div class="lv"><span class="lk">Side</span><span class="lvv" id="dvSide">&ndash;</span></div>
+        <div class="lv"><span class="lk">Phase</span><span class="lvv" id="dvPhase">&ndash;</span></div>
+        <div class="lv"><span class="lk">Vis OK</span><span class="lvv" id="dvVis">&ndash;</span></div>
+        <div class="lv"><span class="lk">Trunk lean&deg;</span><span class="lvv" id="dvLean">&ndash;</span></div>
+        <div class="lv"><span class="lk">Knee&deg;</span><span class="lvv" id="dvKnee">&ndash;</span></div>
+        <div class="lv"><span class="lk">Leg ext 0-1</span><span class="lvv" id="dvLegExt">&ndash;</span></div>
+        <div class="lv"><span class="lk">legProgress</span><span class="lvv" id="dvLegProg">&ndash;</span></div>
+        <div class="lv"><span class="lk">backOpening&deg;</span><span class="lvv" id="dvBackOpen">&ndash;</span></div>
+        <div class="lv"><span class="lk">phase / state</span><span class="lvv" id="dvState">&ndash;</span></div>
+        <div class="lv"><span class="lk">match best %</span><span class="lvv" id="dvMatch">&ndash;</span></div>
+        <div class="lv"><span class="lk">last match %</span><span class="lvv" id="dvLastMatch">&ndash;</span></div>
+        <div class="lv"><span class="lk">capture frames</span><span class="lvv" id="dvFrames">&ndash;</span></div>
+      </div>
+
+      <h4>Self-tuning &mdash; the coach learning itself</h4>
+      <div class="live" id="tuneLive">
+        <div class="lv"><span class="lk">Confidence</span><span class="lvv" id="tvConf">&ndash;</span></div>
+        <div class="lv"><span class="lk">Vis quality</span><span class="lvv" id="tvVis">&ndash;</span></div>
+        <div class="lv"><span class="lk">Seg stability</span><span class="lvv" id="tvStab">&ndash;</span></div>
+        <div class="lv"><span class="lk">Meta samples</span><span class="lvv" id="tvSamples">&ndash;</span></div>
+        <div class="lv"><span class="lk">Status</span><span class="lvv" id="tvStatus">&ndash;</span></div>
+        <div class="lv"><span class="lk">Target fire-rate</span><span class="lvv" id="tvTarget">&ndash;</span></div>
+        <div class="lv"><span class="lk">Observed fire-rate</span><span class="lvv" id="tvObserved">&ndash;</span></div>
+        <div class="lv"><span class="lk">DEV_WARN (tuned)</span><span class="lvv" id="tvDevWarn">&ndash;</span></div>
+        <div class="lv"><span class="lk">DEV_BAD (tuned)</span><span class="lvv" id="tvDevBad">&ndash;</span></div>
+        <div class="lv"><span class="lk">SEQ_ONSET (tuned)</span><span class="lvv" id="tvSeq">&ndash;</span></div>
+        <div class="lv"><span class="lk">DIVERGE (tuned)</span><span class="lvv" id="tvDiverge">&ndash;</span></div>
+        <div class="lv"><span class="lk">Close falloff (tuned)</span><span class="lvv" id="tvClose">&ndash;</span></div>
+      </div>
+
+      <h4>Accumulated distributions (rolling, capped)</h4>
+      <div class="live" id="distLive">
+        <div class="lv"><span class="lk">devSigma n</span><span class="lvv" id="dxDevN">&ndash;</span></div>
+        <div class="lv"><span class="lk">devSigma p50/p83</span><span class="lvv" id="dxDevP">&ndash;</span></div>
+        <div class="lv"><span class="lk">onsetDelta n</span><span class="lvv" id="dxOnsetN">&ndash;</span></div>
+        <div class="lv"><span class="lk">onsetDelta p83</span><span class="lvv" id="dxOnsetP">&ndash;</span></div>
+        <div class="lv"><span class="lk">divergence n</span><span class="lvv" id="dxDivN">&ndash;</span></div>
+        <div class="lv"><span class="lk">divergence p80</span><span class="lvv" id="dxDivP">&ndash;</span></div>
+        <div class="lv"><span class="lk">match p50</span><span class="lvv" id="dxMatchP">&ndash;</span></div>
+        <div class="lv"><span class="lk">best-score drift</span><span class="lvv" id="dxBest">&ndash;</span></div>
+        <div class="lv"><span class="lk">fault classes</span><span class="lvv" id="dxFaults">&ndash;</span></div>
+      </div>
+
+      <h4>Reference (your ghost / best stroke)</h4>
+      <div class="live" id="refLive">
+        <div class="lv"><span class="lk">Source</span><span class="lvv" id="rvSource">&ndash;</span></div>
+        <div class="lv"><span class="lk">Ref score</span><span class="lvv" id="rvScore">&ndash;</span></div>
+        <div class="lv"><span class="lk">Ref spm</span><span class="lvv" id="rvSpm">&ndash;</span></div>
+        <div class="lv"><span class="lk">Ref side</span><span class="lvv" id="rvSide">&ndash;</span></div>
+        <div class="lv"><span class="lk">Traj steps</span><span class="lvv" id="rvN">&ndash;</span></div>
+        <div class="lv"><span class="lk">Drive frac</span><span class="lvv" id="rvDrive">&ndash;</span></div>
+      </div>
+
+      <h4>Learned baseline (your normal)</h4>
+      <div class="live" id="baseLive">
+        <div class="lv"><span class="lk">Status</span><span class="lvv" id="bvStatus">&ndash;</span></div>
+        <div class="lv"><span class="lk">Catch lean</span><span class="lvv" id="bvCatchLean">&ndash;</span></div>
+        <div class="lv"><span class="lk">Finish lean</span><span class="lvv" id="bvFinishLean">&ndash;</span></div>
+        <div class="lv"><span class="lk">Knee min</span><span class="lvv" id="bvKneeMin">&ndash;</span></div>
+        <div class="lv"><span class="lk">Knee max</span><span class="lvv" id="bvKneeMax">&ndash;</span></div>
+        <div class="lv"><span class="lk">Drive s</span><span class="lvv" id="bvDrive">&ndash;</span></div>
+        <div class="lv"><span class="lk">Recovery s</span><span class="lvv" id="bvRecovery">&ndash;</span></div>
+        <div class="lv"><span class="lk">Ratio</span><span class="lvv" id="bvRatio">&ndash;</span></div>
+        <div class="lv"><span class="lk">Seq onset (leg%)</span><span class="lvv" id="bvSeqOnset">&ndash;</span></div>
+      </div>
+
+      <h4>Per-stroke log (last 12)</h4>
+      <div class="logwrap">
+        <table class="log">
+          <thead>
+            <tr>
+              <th>#</th><th>spm</th><th>drv s</th><th>rec s</th><th>ratio</th>
+              <th>catch&deg;</th><th>min knee&deg;</th><th>dev &sigma;</th><th>score</th><th>match%</th><th>flag</th><th>verdict</th>
+            </tr>
+          </thead>
+          <tbody id="logBody">
+            <tr><td colspan="12" class="log-empty">No strokes logged yet &mdash; start rowing.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="debug-actions">
+        <button id="copyLogBtn" class="ghost">Copy log (JSON)</button>
+        <span class="debug-note" id="copyNote">Copies the per-stroke log, learned baseline + the self-tuned thresholds so you can paste it back.</span>
+      </div>
+    </div>
+  </details>
+</aside>
+
 <!--
   =======================================================================
-  APP LOGIC  (ES module so we can `import` the MediaPipe ESM bundle from
-  the CDN directly -- no bundler, no build step.)
+  GHOST -- APP LOGIC  (ES module so we can `import` the MediaPipe ESM bundle
+  from the CDN directly -- no bundler, no build step.)
 
-  v2 architecture (layered ON TOP of the v1 detection core, which is
-  preserved verbatim below):
+  Architecture, layered ON TOP of the preserved detection core:
     [PRESERVED]  model load, camera, side selection, per-frame geometry,
-                 stroke segmentation, sequencing capture.
-    [NEW]        self-calibration -> learned baseline (median + MAD),
-                 deviation scoring vs baseline, 0-100 quality score,
-                 calm/debounced/rotating coaching, localStorage baseline +
-                 session-summary history, premium ring/sparkline UI.
-  PRIVACY: video/frames are never stored or uploaded; the only egress is
-  the no-op postTelemetry() stub. localStorage holds NUMBERS ONLY.
+                 stroke segmentation, sequencing capture, self-calibration
+                 -> learned baseline (median + MAD), 0-100 quality score,
+                 ghost/replay/closeness, progress history, telemetry stub.
+    [NEW in v4]  a SELF-OPTIMISATION layer for the ALGORITHM ITSELF: it
+                 accumulates per-stroke metric distributions across sessions
+                 (localStorage, rolling + capped) and AUTO-TUNES its own
+                 fault/deviation thresholds from those distributions so faults
+                 fire at a sensible TARGET RATE (~the worst 15-20% of his own
+                 strokes) instead of fixed constants -- anchored + rate-limited
+                 so it can't drift or oscillate, falling back to the constants
+                 until enough data is gathered. It also SELF-MONITORS its
+                 detection confidence (landmark visibility + segmentation
+                 stability); when low it widens tolerance + softens coaching
+                 ("reading you...") rather than emit garbage. The look is
+                 rebuilt around a single luminous figure on a Monument-Valley
+                 dusk; one score read + one cue line, everything else behind
+                 one menu.
+  PRIVACY: video/frames are never stored or uploaded; the only egress is the
+  no-op postTelemetry() stub. localStorage holds NUMBERS ONLY (baseline,
+  session summaries, the best-stroke trajectory, and the accumulated metric
+  distributions the coach tunes itself from) -- never frames or images.
   =======================================================================
 -->
 <script type="module">
@@ -851,6 +952,7 @@ const flipBtn    = document.getElementById("flipSideBtn");
 const cameraBtn  = document.getElementById("cameraBtn");
 const videoToggleBtn = document.getElementById("videoToggleBtn");
 const clearHistBtn = document.getElementById("clearHistBtn");
+const clearTuneBtn = document.getElementById("clearTuneBtn");
 const stage      = document.getElementById("stage");
 // v3 kinetic-loop controls.
 const saveStrokeBtn = document.getElementById("saveStrokeBtn");
@@ -858,6 +960,11 @@ const replayBtn  = document.getElementById("replayBtn");
 const ghostBtn   = document.getElementById("ghostBtn");
 const viewBtn    = document.getElementById("viewBtn");
 const clearRefBtn= document.getElementById("clearRefBtn");
+// v4 lean-UI shell: the single menu + slide-up sheet.
+const menuBtn    = document.getElementById("menuBtn");
+const sheet      = document.getElementById("sheet");
+const sheetScrim = document.getElementById("sheetScrim");
+const sheetClose = document.getElementById("sheetClose");
 
 const el = {
   spm:      document.getElementById("mSpm"),
@@ -875,19 +982,18 @@ const el = {
   cueText:  document.getElementById("cueText"),
   cueSub:   document.getElementById("cueSub"),
   coachPill:document.getElementById("coachPill"),
-  // HUD hero
-  hudSpm:   document.getElementById("hudSpm"),
-  hudMatch: document.getElementById("hudMatch"),
-  hudMatchVal: document.getElementById("hudMatchVal"),
-  hudPhase: document.getElementById("hudPhase"),
+  // Lean HUD: the one score read + the one cue line + the self-tuning pip.
   hudCue:   document.getElementById("hudCue"),
-  hudCueSub:document.getElementById("hudCueSub"),
   ringWrap: document.getElementById("ringWrap"),
   ringProg: document.getElementById("ringProg"),
   ringScore:document.getElementById("ringScore"),
   ringLabel:document.getElementById("ringLabel"),
   calib:    document.getElementById("calib"),
   calibBar: document.getElementById("calibBar"),
+  calibLabel:document.getElementById("calibLabel"),
+  selftune: document.getElementById("selftune"),
+  stLabel:  document.getElementById("stLabel"),
+  stConf:   document.getElementById("stConf"),
   // Sequencing strip segments + order labels.
   segLegs:  document.getElementById("segLegs"),
   segBody:  document.getElementById("segBody"),
@@ -922,6 +1028,29 @@ const el = {
   dvMatch:  document.getElementById("dvMatch"),
   dvLastMatch: document.getElementById("dvLastMatch"),
   dvFrames: document.getElementById("dvFrames"),
+  // Self-tuning (debug) -- the coach learning itself.
+  tvConf:   document.getElementById("tvConf"),
+  tvVis:    document.getElementById("tvVis"),
+  tvStab:   document.getElementById("tvStab"),
+  tvSamples:document.getElementById("tvSamples"),
+  tvStatus: document.getElementById("tvStatus"),
+  tvTarget: document.getElementById("tvTarget"),
+  tvObserved:document.getElementById("tvObserved"),
+  tvDevWarn:document.getElementById("tvDevWarn"),
+  tvDevBad: document.getElementById("tvDevBad"),
+  tvSeq:    document.getElementById("tvSeq"),
+  tvDiverge:document.getElementById("tvDiverge"),
+  tvClose:  document.getElementById("tvClose"),
+  // Accumulated distributions (debug).
+  dxDevN:   document.getElementById("dxDevN"),
+  dxDevP:   document.getElementById("dxDevP"),
+  dxOnsetN: document.getElementById("dxOnsetN"),
+  dxOnsetP: document.getElementById("dxOnsetP"),
+  dxDivN:   document.getElementById("dxDivN"),
+  dxDivP:   document.getElementById("dxDivP"),
+  dxMatchP: document.getElementById("dxMatchP"),
+  dxBest:   document.getElementById("dxBest"),
+  dxFaults: document.getElementById("dxFaults"),
   // Reference (debug)
   rvSource: document.getElementById("rvSource"),
   rvScore:  document.getElementById("rvScore"),
@@ -1005,6 +1134,21 @@ function robustSD(a, floor) {
   const mad = median(devs);
   const sd = isFiniteNum(mad) ? mad * 1.4826 : NaN;
   return Math.max(floor, isFiniteNum(sd) ? sd : 0);
+}
+
+/** The p-th percentile (0..1) of an array via linear interpolation between
+ *  ranks. Used by the SELF-OPTIMISATION layer to read a value off the user's
+ *  accumulated distribution (e.g. his ~83rd-percentile deviation -> the
+ *  threshold that flags roughly his worst ~17% of strokes). Returns NaN when
+ *  there's nothing usable. */
+function percentile(a, p) {
+  const xs = a.filter(isFiniteNum).slice().sort((q, r) => q - r);
+  if (!xs.length) return NaN;
+  if (xs.length === 1) return xs[0];
+  const idx = clamp(p, 0, 1) * (xs.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return xs[lo];
+  return xs[lo] + (xs[hi] - xs[lo]) * (idx - lo);
 }
 
 // ===========================================================================
@@ -1117,14 +1261,12 @@ function trajJointDistances(A, B) {
   return sums.map((s, k) => (counts[k] ? s / counts[k] : NaN));
 }
 
-/** Closeness "match %" 0..100 from two trajectories: mean normalised joint
- *  distance mapped through a soft falloff so identical shape -> 100 and a wildly
- *  different stroke -> near 0. Hands/shoulders are weighted a touch more (they
- *  carry the rowing shape). Independent of the fault thresholds. */
-function trajCloseness(A, B) {
+/** Weighted mean canonical joint distance between two trajectories (the raw
+ *  pre-image of the closeness %). Hands/shoulders weighted a touch more (they
+ *  carry the rowing shape). Returns NaN if not comparable. */
+function trajMeanDistance(A, B) {
   const d = trajJointDistances(A, B);
   if (!d) return NaN;
-  // Per-joint weights (sum normalised below): handle + trunk carry the stroke.
   const W = { ank: 0.8, knee: 1.0, hip: 0.6, sho: 1.1, elb: 1.0, hand: 1.4 };
   const wArr = TRAJ_KEYS.map((k) => W[k]);
   let num = 0, den = 0;
@@ -1134,9 +1276,20 @@ function trajCloseness(A, B) {
     den += wArr[k];
   }
   if (den < 1e-6) return NaN;
-  const meanDist = num / den;                       // mean canonical distance
-  // Falloff: dist 0 -> 100%; ~0.35 canonical units -> ~50%; large -> ~0.
-  const match = 100 * Math.exp(-(meanDist * meanDist) / (2 * 0.30 * 0.30));
+  return num / den;
+}
+
+/** Closeness "match %" 0..100 from two trajectories: the mean canonical joint
+ *  distance mapped through a soft Gaussian falloff so identical shape -> 100 and
+ *  a wildly different stroke -> near 0. The falloff SIGMA is SELF-TUNED (TH-
+ *  "close"): GHOST sizes it from his own match-distance spread so "100% match"
+ *  stays meaningful for HIM, falling back to the constant until enough data.
+ *  Independent of the fault thresholds. */
+function trajCloseness(A, B) {
+  const meanDist = trajMeanDistance(A, B);
+  if (!isFiniteNum(meanDist)) return NaN;
+  const sigma = TH("close");                        // self-tuned + confidence-widened
+  const match = 100 * Math.exp(-(meanDist * meanDist) / (2 * sigma * sigma));
   return clamp(match, 0, 100);
 }
 
@@ -1245,6 +1398,19 @@ const S = {
   replaying: false,         // replay overlay active (loops the reference as a Tron cartoon)
   ghostOn: true,            // ghost-compare overlay enabled (live vs reference)
   reduceMotion: false,      // mirrors prefers-reduced-motion (trail/pulse trimmed)
+
+  // ----- v4 SELF-OPTIMISATION (the coach tuning its OWN analysis) ----------
+  // The accumulated cross-session distributions (numbers only) the coach tunes
+  // itself from, plus the live confidence read + the currently-active tuned
+  // thresholds. `meta` persists to localStorage; `tuned` + confidence are
+  // derived/in-memory.
+  meta: null,               // accumulated distributions object (see makeEmptyMeta) or null until loaded
+  tuned: null,              // currently-active self-tuned thresholds (see computeAdaptiveThresholds)
+  confidence: 1,            // smoothed 0..1 detection confidence (visibility + segmentation stability)
+  visQuality: 1,            // smoothed 0..1 mean landmark-visibility of the tracked joints
+  segStability: 1,          // smoothed 0..1 segmentation stability (low = jittery / unreliable)
+  liveDevSigma: NaN,        // smoothed worst per-frame-ish deviation read (for the live confidence-softening)
+  strokeMaxDivergence: NaN, // max live ghost divergence seen during the current stroke (-> meta accumulation)
 };
 
 // Tunables (documented inline where used).
@@ -1264,10 +1430,13 @@ const CFG = {
   WARMUP_STROKES: 2,        // strokes ignored before learning begins (let detection settle)
   CALIB_STROKES: 12,        // strokes collected to learn the user's normal
 
-  // ---- Deviation thresholds (RELATIVE to the user's own baseline) ----
-  // A metric is "off" when it deviates beyond DEV_WARN robust-SDs from baseline,
-  // and "well off" beyond DEV_BAD. This is the v1 over-firing fix: nothing flags
-  // unless it is meaningfully unlike HIS normal.
+  // ---- Deviation thresholds -- now the COLD-START FALLBACK only ----
+  // These are the sensible defaults the coach uses UNTIL it has accumulated
+  // enough of the user's own strokes to self-tune (see the SELF-OPTIMISATION
+  // section). A metric is "off" beyond DEV_WARN robust-SDs from baseline, "well
+  // off" beyond DEV_BAD. Once tuned, the live values come from S.tuned instead
+  // (read everywhere via the TH() accessor) -- these stay as the fallback +
+  // the anchor the adaptation is held toward so it can't drift far.
   DEV_WARN: 2.0,            // robust-SDs from baseline -> a noticeable deviation
   DEV_BAD: 3.2,             // robust-SDs -> a large deviation
   SEQ_ONSET_WARN: 0.18,     // legProgress-at-body-open this much BELOW baseline = early back-open
@@ -1289,19 +1458,367 @@ const CFG = {
   BODY_GO_DELTA: 4,         // deg of back-opening past which the body has "engaged"
   ARMS_GO_DELTA: 0.04,      // wrist->shoulder closeness drop that means arms have "engaged"
 
-  // ---- v3 trajectory / ghost / closeness ----
+  // ---- v3 trajectory / ghost / closeness (DIVERGE_FLARE + CLOSE_FALLOFF now
+  //      also self-tuned; these remain the cold-start fallback + anchor) ----
   TRAIL_MAX: 9,             // frames in the fading motion trail (Tron figure)
   BARPATH_MAX: 46,          // handle positions kept for the faint bar-path trace
   CLOSE_EMA: 0.4,           // smoothing applied to the displayed closeness/match %
   DIVERGE_FLARE: 0.16,      // per-joint canonical distance above which the ghost flares amber
+  CLOSE_FALLOFF: 0.30,      // closeness Gaussian sigma (canonical units) -> match% falloff
   GHOST_MIN_FRAMES: 6,      // min frames captured this stroke before we attempt a live ghost align
+
+  // ---- v4 SELF-OPTIMISATION (the coach tuning its OWN sensitivity) ----
+  TARGET_FIRE_RATE: 0.17,   // aim to flag ~the worst 17% of HIS strokes (his ~83rd pct of deviation)
+  META_MIN_SAMPLES: 25,     // accumulated scored strokes before any auto-tuning kicks in (cold-start until then)
+  META_CAP: 600,            // rolling cap on each accumulated distribution (numbers only)
+  META_SESSION_CAP: 240,    // per-session cap fed into the rolling stores (bounds one long session)
+  TUNE_BLEND: 0.6,          // how far a fresh recompute moves toward the data-derived target (vs the anchor)
+  TUNE_STEP_MAX: 0.18,      // max fractional move of a tuned threshold per recompute (rate-limit / anti-oscillation)
+  TUNE_EVERY: 5,            // recompute the tuned thresholds at most once per N scored strokes
+  // Anchoring bands: each tuned threshold is clamped to [anchor*lo, anchor*hi]
+  // so it can self-correct sensitivity but never run away or invert.
+  TUNE_BAND: {
+    devWarn:  [0.70, 1.40], // DEV_WARN may roam 1.4..2.8 around the 2.0 anchor
+    devBad:   [0.78, 1.30], // DEV_BAD  roams ~2.5..4.2 around 3.2
+    seqOnset: [0.55, 1.80], // SEQ_ONSET_WARN
+    diverge:  [0.60, 1.70], // DIVERGE_FLARE
+    close:    [0.65, 1.55], // CLOSE_FALLOFF
+  },
+  DEV_BAD_MULT: 1.6,        // DEV_BAD is derived as DEV_WARN * this (then anchored to its own band)
+
+  // ---- Confidence model (self-monitoring detection reliability) ----
+  CONF_EMA: 0.12,           // smoothing on the live confidence read (calm, not twitchy)
+  CONF_LOW: 0.55,           // below this confidence -> widen tolerance + soften coaching
+  CONF_VERY_LOW: 0.4,       // below this -> suppress coaching entirely ("reading you...")
+  CONF_WIDEN_MAX: 0.6,      // at zero confidence, thresholds widen by up to +60%
+  SEG_PERIOD_CV_BAD: 0.45,  // recent stroke-period coefficient-of-variation that reads as fully unstable
+
+  // ---- Adapt-as-he-improves (baseline/best slowly track upward, anchored) ----
+  BEST_DRIFT_PER_SESSION: 1.5, // max points the stored best-score floor may rise per session (keeps challenging, stays sane)
+  BEST_DRIFT_CAP: 12,       // total upward drift the best floor may accumulate over the default
 };
 
 // localStorage keys (NUMBERS ONLY ever written here).
 const LS_BASELINE = "rowingCoach.baseline.v2";
 const LS_HISTORY  = "rowingCoach.history.v2";
 const LS_REFERENCE = "rowingCoach.reference.v3";  // best REFERENCE trajectory (numbers only)
+const LS_META      = "ghost.meta.v4";             // accumulated distributions the coach self-tunes from (numbers only)
 const HISTORY_MAX = 60;     // sessions kept locally
+
+// ===========================================================================
+//  *** v4 SELF-OPTIMISATION LAYER ***  (the coach improving its OWN analysis)
+//  --------------------------------------------------------------------------
+//  This layer is for the ALGORITHM, not the user. It does four things:
+//
+//   1. ACCUMULATE -- every scored stroke pushes its deviation/onset/divergence/
+//      closeness/fault numbers into rolling, capped distributions held in
+//      localStorage (LS_META). Numbers only -- never frames.
+//
+//   2. AUTO-TUNE -- instead of fixed constants, the fault/deviation thresholds
+//      are read off those distributions so faults fire at a TARGET RATE (~the
+//      worst TARGET_FIRE_RATE of HIS strokes, i.e. beyond his own ~83rd
+//      percentile of deviation). Sensitivity self-corrects: over-firing tightens
+//      it, silence loosens it. Each tuned value is (a) blended toward the
+//      data-derived target, (b) clamped to an anchoring BAND around the constant
+//      so it can't run away or invert, and (c) rate-limited to a small step per
+//      recompute so it converges smoothly and never oscillates. Until
+//      META_MIN_SAMPLES strokes are gathered, it falls back to the constants.
+//
+//   3. SELF-MONITOR CONFIDENCE -- a live 0..1 read of detection reliability
+//      (landmark visibility + segmentation stability). When low, every threshold
+//      is WIDENED (more tolerant) and coaching is softened/suppressed ("reading
+//      you...") so the coach never emits garbage from a poor read.
+//
+//   4. ADAPT AS HE IMPROVES -- the persisted best-score floor is allowed to
+//      drift slowly upward (anchored + capped) so the bar keeps rising.
+//
+//  Everything is exposed in the debug panel + a small calm on-stage indicator.
+// ===========================================================================
+
+/** A fresh, empty accumulator. Each field is a rolling array (capped on write)
+ *  of NUMBERS ONLY. `faults` counts how often each cue class has fired. */
+function makeEmptyMeta() {
+  return {
+    v: 4,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    sessions: 0,                 // distinct sessions that have contributed
+    scoredStrokes: 0,            // lifetime scored strokes accumulated
+    devSigma: [],                // worst single-metric deviation (robust-SDs) per scored stroke
+    onsetDelta: [],              // baseline.seqOnset.med - stroke.seqOnset (early-back magnitude; +ve = earlier than normal)
+    divergence: [],              // per-stroke worst live ghost divergence (canonical units)
+    matchDist: [],               // per-stroke mean canonical distance to the reference (closeness pre-image)
+    match: [],                   // per-stroke closeness % vs the reference
+    perMetricAbsZ: {             // |z| of each posture/rhythm metric vs baseline (for inspection)
+      catchLean: [], finishLean: [], kneeMin: [], kneeMax: [], ratio: [], strokeLen: [], seqOnset: [],
+    },
+    faults: {},                  // cueClass -> count
+    fired: [],                   // rolling 0/1 of whether each scored stroke surfaced a cue (observed fire-rate)
+    confidence: [],              // rolling confidence reads at stroke close (detection-reliability history)
+    bestDrift: 0,                // accumulated upward drift applied to the best-score floor (anchored, capped)
+  };
+}
+
+/** Cap a rolling array in place (keep the most recent CFG.META_CAP). */
+function capRoll(arr) { if (arr.length > CFG.META_CAP) arr.splice(0, arr.length - CFG.META_CAP); }
+
+function loadMeta() {
+  let m = null;
+  try {
+    const raw = localStorage.getItem(LS_META);
+    if (raw) { const o = JSON.parse(raw); if (o && o.v === 4 && Array.isArray(o.devSigma)) m = o; }
+  } catch (_) { m = null; }
+  if (!m) m = makeEmptyMeta();
+  // Defensive: ensure all expected fields exist (forward-compatible).
+  const base = makeEmptyMeta();
+  for (const k of Object.keys(base)) if (m[k] == null) m[k] = base[k];
+  if (!m.perMetricAbsZ) m.perMetricAbsZ = base.perMetricAbsZ;
+  S.meta = m;
+  return m;
+}
+function saveMeta() {
+  if (!S.meta) return;
+  S.meta.updatedAt = Date.now();
+  try { localStorage.setItem(LS_META, JSON.stringify(S.meta)); } catch (_) { /* storage may be full/unavailable */ }
+}
+/** Forget everything the coach has learned about its OWN sensitivity (a clear-
+ *  data control). Resets to the cold-start fallback constants. */
+function clearMeta() {
+  S.meta = makeEmptyMeta();
+  S.tuned = null;
+  try { localStorage.removeItem(LS_META); } catch (_) { /* ignore */ }
+  recomputeAdaptiveThresholds(true);
+}
+
+// Count this session once (the first scored stroke bumps it).
+let _metaSessionCounted = false;
+
+/** Fold one completed, SCORED stroke into the accumulated distributions. Called
+ *  from emitStroke for ready-phase strokes only. Numbers only. */
+function accumulateStrokeMeta(stroke, extras) {
+  if (!S.meta) loadMeta();
+  const m = S.meta;
+  if (!_metaSessionCounted) { m.sessions = (m.sessions || 0) + 1; _metaSessionCounted = true; }
+  m.scoredStrokes = (m.scoredStrokes || 0) + 1;
+
+  if (isFiniteNum(stroke.devSigma)) { m.devSigma.push(stroke.devSigma); capRoll(m.devSigma); }
+  if (extras && isFiniteNum(extras.onsetDelta)) { m.onsetDelta.push(extras.onsetDelta); capRoll(m.onsetDelta); }
+  if (extras && isFiniteNum(extras.divergence)) { m.divergence.push(extras.divergence); capRoll(m.divergence); }
+  if (extras && isFiniteNum(extras.matchDist)) { m.matchDist.push(extras.matchDist); capRoll(m.matchDist); }
+  if (isFiniteNum(stroke.matchPct)) { m.match.push(stroke.matchPct); capRoll(m.match); }
+  if (isFiniteNum(S.confidence)) { m.confidence.push(round(S.confidence, 3)); capRoll(m.confidence); }
+  // Observed fire-rate: did this stroke surface a cue?
+  m.fired.push(stroke.cueClass ? 1 : 0); capRoll(m.fired);
+  if (stroke.cueClass) m.faults[stroke.cueClass] = (m.faults[stroke.cueClass] || 0) + 1;
+  // Per-metric |z| (for inspection only).
+  if (extras && extras.absZ) {
+    for (const k of Object.keys(m.perMetricAbsZ)) {
+      if (isFiniteNum(extras.absZ[k])) { m.perMetricAbsZ[k].push(round(extras.absZ[k], 2)); capRoll(m.perMetricAbsZ[k]); }
+    }
+  }
+
+  // Recompute the tuned thresholds at most once per TUNE_EVERY scored strokes.
+  if (m.scoredStrokes % CFG.TUNE_EVERY === 0) recomputeAdaptiveThresholds(false);
+  saveMeta();
+}
+
+/** Have we accumulated enough to self-tune at all? */
+function metaReady() { return !!(S.meta && S.meta.devSigma && S.meta.devSigma.length >= CFG.META_MIN_SAMPLES); }
+
+/** Move `cur` toward `target`, but no more than `stepFrac` of the anchor per
+ *  call (rate-limit), then clamp to [anchor*lo, anchor*hi] (anchoring band).
+ *  This is the anti-drift / anti-oscillation core: bounded step + bounded range. */
+function anchoredStep(cur, target, anchor, band, stepFrac) {
+  if (!isFiniteNum(cur)) cur = anchor;
+  if (!isFiniteNum(target)) return cur;
+  const maxStep = Math.abs(anchor) * stepFrac;
+  let next = cur + clamp(target - cur, -maxStep, maxStep);
+  return clamp(next, anchor * band[0], anchor * band[1]);
+}
+
+/**
+ * Derive the self-tuned thresholds from the accumulated distributions.
+ *  - DEV_WARN  <- his TARGET_FIRE_RATE percentile of devSigma (so beyond it lies
+ *                 his worst ~17% of strokes). Blended toward that target, then
+ *                 anchored + rate-limited.
+ *  - DEV_BAD   <- DEV_WARN * DEV_BAD_MULT (or his ~95th-pct devSigma if higher),
+ *                 anchored to its own band.
+ *  - SEQ_ONSET <- his (1-TARGET) percentile of the EARLY-side onsetDelta (only
+ *                 the early-opening tail matters), anchored.
+ *  - DIVERGE   <- his ~80th-pct live divergence, anchored.
+ *  - CLOSE     <- closeness falloff sigma set from his matchDist spread so "match
+ *                 100%" stays meaningful for HIM (his median stroke lands sensibly
+ *                 high, not pinned), anchored.
+ *  `force` recomputes from the anchors (used on cold-start / reset).
+ */
+function recomputeAdaptiveThresholds(force) {
+  const A = CFG, B = A.TUNE_BAND;
+  // Start from whatever we currently use (tuned-or-anchor) so steps are relative.
+  const cur = S.tuned || {
+    devWarn: A.DEV_WARN, devBad: A.DEV_BAD, seqOnset: A.SEQ_ONSET_WARN,
+    diverge: A.DIVERGE_FLARE, close: A.CLOSE_FALLOFF,
+  };
+
+  if (force || !metaReady()) {
+    // Cold-start / reset: sit on the anchors exactly.
+    S.tuned = {
+      devWarn: A.DEV_WARN, devBad: A.DEV_BAD, seqOnset: A.SEQ_ONSET_WARN,
+      diverge: A.DIVERGE_FLARE, close: A.CLOSE_FALLOFF,
+      source: "cold-start", at: Date.now(),
+    };
+    return S.tuned;
+  }
+
+  const m = S.meta;
+  const blend = A.TUNE_BLEND, step = A.TUNE_STEP_MAX;
+
+  // --- DEV_WARN: the deviation at his target fire-rate (worst TARGET_FIRE_RATE) ---
+  // The threshold that flags the worst X% sits at the (1 - X) percentile.
+  const devTarget = percentile(m.devSigma, 1 - A.TARGET_FIRE_RATE);
+  let devWarnGoal = isFiniteNum(devTarget) ? devTarget : A.DEV_WARN;
+  // Blend toward the goal from the current value (keeps it stable between recomputes).
+  devWarnGoal = cur.devWarn + (devWarnGoal - cur.devWarn) * blend;
+  const devWarn = anchoredStep(cur.devWarn, devWarnGoal, A.DEV_WARN, B.devWarn, step);
+
+  // --- DEV_BAD: a clear margin above DEV_WARN, but at least his ~95th pct ---
+  const devBadP95 = percentile(m.devSigma, 0.95);
+  let devBadGoal = Math.max(devWarn * A.DEV_BAD_MULT, isFiniteNum(devBadP95) ? devBadP95 : 0);
+  devBadGoal = cur.devBad + (devBadGoal - cur.devBad) * blend;
+  const devBad = Math.max(devWarn + 0.4, anchoredStep(cur.devBad, devBadGoal, A.DEV_BAD, B.devBad, step));
+
+  // --- SEQ_ONSET_WARN: the early-open magnitude at his (1-target) percentile ---
+  // onsetDelta > 0 means the body opened EARLIER than his baseline; we flag the
+  // worst tail of that, so the threshold is the (1 - target) pct of the positive side.
+  const earlySide = m.onsetDelta.filter((v) => isFiniteNum(v) && v > 0);
+  let seqGoal = A.SEQ_ONSET_WARN;
+  if (earlySide.length >= Math.max(8, Math.round(CFG.META_MIN_SAMPLES * 0.4))) {
+    const p = percentile(earlySide, 1 - A.TARGET_FIRE_RATE);
+    if (isFiniteNum(p) && p > 0) seqGoal = p;
+  }
+  seqGoal = cur.seqOnset + (seqGoal - cur.seqOnset) * blend;
+  const seqOnset = anchoredStep(cur.seqOnset, seqGoal, A.SEQ_ONSET_WARN, B.seqOnset, step);
+
+  // --- DIVERGE_FLARE: his ~80th-pct live divergence (flare on the worst ~20%) ---
+  let divGoal = A.DIVERGE_FLARE;
+  if (m.divergence.length >= 12) {
+    const p = percentile(m.divergence, 0.80);
+    if (isFiniteNum(p) && p > 0) divGoal = p;
+  }
+  divGoal = cur.diverge + (divGoal - cur.diverge) * blend;
+  const diverge = anchoredStep(cur.diverge, divGoal, A.DIVERGE_FLARE, B.diverge, step);
+
+  // --- CLOSE_FALLOFF: size the closeness sigma to his own match-distance spread ---
+  // Aim so his MEDIAN stroke reads ~80% match (not pinned at 100, not crushed):
+  // match = exp(-d^2/(2 sigma^2)) = 0.8  ->  sigma = medDist / sqrt(-2 ln 0.8).
+  let closeGoal = A.CLOSE_FALLOFF;
+  if (m.matchDist.length >= 12) {
+    const medDist = median(m.matchDist);
+    if (isFiniteNum(medDist) && medDist > 1e-4) {
+      const sigma = medDist / Math.sqrt(-2 * Math.log(0.8));
+      if (isFiniteNum(sigma) && sigma > 0) closeGoal = sigma;
+    }
+  }
+  closeGoal = cur.close + (closeGoal - cur.close) * blend;
+  const close = anchoredStep(cur.close, closeGoal, A.CLOSE_FALLOFF, B.close, step);
+
+  S.tuned = { devWarn, devBad, seqOnset, diverge, close, source: "self-tuned", at: Date.now() };
+  return S.tuned;
+}
+
+/** The observed recent fire-rate (fraction of recent scored strokes that
+ *  surfaced a cue). Used for the debug read + a sanity nudge. */
+function observedFireRate() {
+  if (!S.meta || !S.meta.fired.length) return NaN;
+  const recent = S.meta.fired.slice(-Math.min(60, S.meta.fired.length));
+  return mean(recent);
+}
+
+/**
+ * THE THRESHOLD ACCESSOR -- the one place the rest of the app reads a tuned
+ * threshold. Returns the self-tuned value (or the cold-start constant), THEN
+ * widened by the confidence model: when detection confidence is low we make the
+ * coach more tolerant (higher deviation / divergence needed to flag, and a wider
+ * closeness sigma) so a poor read can't manufacture faults. key in:
+ *   "devWarn" | "devBad" | "seqOnset" | "diverge" | "close"
+ */
+function TH(key) {
+  const t = S.tuned || {
+    devWarn: CFG.DEV_WARN, devBad: CFG.DEV_BAD, seqOnset: CFG.SEQ_ONSET_WARN,
+    diverge: CFG.DIVERGE_FLARE, close: CFG.CLOSE_FALLOFF,
+  };
+  let v = t[key];
+  if (!isFiniteNum(v)) v = CFG[({ devWarn: "DEV_WARN", devBad: "DEV_BAD", seqOnset: "SEQ_ONSET_WARN",
+                                  diverge: "DIVERGE_FLARE", close: "CLOSE_FALLOFF" })[key]];
+  // Confidence widening: 1.0 at full confidence, up to (1 + CONF_WIDEN_MAX) at zero.
+  const widen = 1 + CFG.CONF_WIDEN_MAX * (1 - clamp(S.confidence, 0, 1));
+  return v * widen;
+}
+
+/** Confidence band for the on-stage pip + coaching gate. */
+function confidenceState() {
+  const c = S.confidence;
+  if (!isFiniteNum(c)) return "ok";
+  if (c < CFG.CONF_VERY_LOW) return "verylow";
+  if (c < CFG.CONF_LOW) return "low";
+  return "ok";
+}
+
+/**
+ * SELF-MONITOR: update the live detection-confidence read each frame. Two inputs:
+ *   visQuality  -- mean visibility of the tracked side joints (how clearly the
+ *                  model sees him). High = clean read.
+ *   segStability-- how steady the recent stroke periods are. A wildly varying
+ *                  period (or none yet) reads as unstable / unreliable.
+ *  Both are EMA-smoothed (calm, not twitchy) and combined into S.confidence.
+ */
+function updateConfidence(visScores) {
+  // Visibility quality: mean of the four core side joints' visibility, mapped
+  // from [VIS_THRESH..1] -> [0..1] so "just visible" isn't full confidence.
+  let vq = NaN;
+  if (visScores && visScores.length) {
+    const mv = mean(visScores.filter(isFiniteNum));
+    if (isFiniteNum(mv)) vq = clamp((mv - CFG.VIS_THRESH) / (1 - CFG.VIS_THRESH), 0, 1);
+  }
+  if (isFiniteNum(vq)) S.visQuality = ema(S.visQuality, vq, CFG.CONF_EMA);
+
+  // Segmentation stability: coefficient of variation of recent stroke periods.
+  // No strokes yet -> neutral-low (we're not sure). Tight periods -> stable.
+  let stab;
+  if (S.periods.length >= 3) {
+    const mp = mean(S.periods);
+    const cv = mp > 1e-3 ? stdev(S.periods) / mp : 1;
+    stab = clamp(1 - cv / CFG.SEG_PERIOD_CV_BAD, 0, 1);
+  } else {
+    stab = 0.5;   // unknown -> middling, so coaching stays soft until rhythm settles
+  }
+  S.segStability = ema(S.segStability, stab, CFG.CONF_EMA);
+
+  // Combined confidence: visibility dominates (it's the harder failure), with
+  // stability as a secondary gate.
+  const combined = 0.65 * S.visQuality + 0.35 * S.segStability;
+  S.confidence = ema(S.confidence, clamp(combined, 0, 1), CFG.CONF_EMA);
+}
+
+/**
+ * ADAPT AS HE IMPROVES: the effective best-score floor. The stored personal
+ * best naturally rises as he rows better; on top of that we let a small,
+ * capped upward DRIFT accumulate so the bar keeps nudging higher rather than
+ * sitting forever at one good day. Anchored: the drift is capped (BEST_DRIFT_CAP)
+ * and only ever rises, so it stays sane.
+ */
+function noteBestDriftForSession() {
+  if (!S.meta) return;
+  // Only drift upward if he's actually been scoring near/above his best lately.
+  const recent = S.scoreHistory.slice(-8).filter(isFiniteNum);
+  if (recent.length < 4) return;
+  const m = mean(recent);
+  if (!isFiniteNum(m)) return;
+  // If the recent average is strong, allow a small upward drift (anchored + capped).
+  if (m >= 70) {
+    S.meta.bestDrift = clamp((S.meta.bestDrift || 0) + CFG.BEST_DRIFT_PER_SESSION, 0, CFG.BEST_DRIFT_CAP);
+    saveMeta();
+  }
+}
 
 // ===========================================================================
 //  TELEMETRY HOOK  (centralised; stream-ready)
@@ -1399,6 +1916,14 @@ function getLiveSnapshot() {
       ? { score: S.reference.score, spm: S.reference.spm, side: S.reference.side,
           n: S.reference.n, driveFrac: S.reference.driveFrac, at: S.reference.at }
       : null,
+    // v4 self-optimisation: live confidence + the active self-tuned thresholds.
+    confidence: round(S.confidence, 3),
+    visQuality: round(S.visQuality, 3),
+    segStability: round(S.segStability, 3),
+    tuned: S.tuned,                          // {devWarn, devBad, seqOnset, diverge, close, source}
+    tunedReady: metaReady(),
+    targetFireRate: CFG.TARGET_FIRE_RATE,
+    observedFireRate: round(observedFireRate(), 3),
   };
 }
 
@@ -1689,11 +2214,12 @@ function onCatch(sample) {
         side: S.chosenSide, score: cls.score, spm: round(60 / period),
         startT: S.curStrokeStartT, finishT: S.curFinishT,
       });
-      let matchPct = null;
+      let matchPct = null, matchDist = NaN;
       if (traj) {
         S.lastTraj = traj;
         // Closeness only matters once we have a reference AND a real score.
         if (S.reference && cls.score != null) {
+          matchDist = trajMeanDistance(traj, S.reference);   // raw pre-image (for self-tuning the falloff)
           const c = trajCloseness(traj, S.reference);
           if (isFiniteNum(c)) {
             S.lastCloseness = c;
@@ -1708,7 +2234,7 @@ function onCatch(sample) {
       }
 
       // Emit telemetry (in-memory log + stream stub). Numbers only, rounded.
-      emitStroke({
+      const strokeObj = {
         stroke:    S.strokeCount,
         t:         Math.round(sample.t),
         spm:       round(60 / period),
@@ -1734,9 +2260,24 @@ function onCatch(sample) {
         // v3 closeness-to-best (null until a reference exists + the stroke scored).
         matchPct:  matchPct == null ? null : round(matchPct),
         hasTraj:   !!traj,
-      });
+      };
+      emitStroke(strokeObj);
+
+      // *** v4 SELF-OPTIMISATION: fold SCORED strokes into the accumulated
+      //  distributions so the coach can tune its own thresholds. (Warm-up /
+      //  learning strokes have score == null and are skipped.) ***
+      if (cls.phaseWhenClosed === "ready" && cls.score != null) {
+        accumulateStrokeMeta(strokeObj, {
+          onsetDelta: cls.onsetDelta,
+          divergence: isFiniteNum(S.strokeMaxDivergence) ? S.strokeMaxDivergence : NaN,
+          matchDist,
+          absZ: cls.absZ,
+        });
+      }
     }
   }
+  // Reset the per-stroke max-divergence accumulator for the new stroke.
+  S.strokeMaxDivergence = NaN;
   // v3: a new stroke starts here -- reset the trajectory frame buffer + timers.
   S.strokeFrames = [];
   S.curStrokeStartT = sample.t;
@@ -1895,7 +2436,13 @@ function processStrokeForCalibration(m) {
   S.score = isFiniteNum(S.score) ? ema(S.score, scored.score, CFG.SCORE_EMA) : scored.score;
 
   const cls = classifyStroke(m, scored);
-  return { ...cls, score: scored.score, devSigma: scored.worstSigma, phaseWhenClosed: "ready" };
+  // Carry the per-metric |z| map + the onset deviation through so the self-
+  // optimisation accumulator can fold them into its distributions.
+  const onsetDelta = (S.baseline && isFiniteNum(m.seqOnset) && isFiniteNum(S.baseline.seqOnset.med))
+    ? (S.baseline.seqOnset.med - m.seqOnset)         // +ve = body opened EARLIER than his normal
+    : NaN;
+  return { ...cls, score: scored.score, devSigma: scored.worstSigma, phaseWhenClosed: "ready",
+           absZ: scored.absZ, onsetDelta };
 }
 
 function resetCalSamples() {
@@ -1999,10 +2546,17 @@ function scoreStroke(m) {
   const score = clamp(Math.round(raw * 100), 0, 100);
 
   // Worst single-metric deviation (robust-SDs) for the debug column + telemetry.
-  const allZ = [...postureZs, Math.abs(onsetZ), Math.abs(zScore(m.ratio, b.ratio))].filter(isFiniteNum);
+  const zRatio = Math.abs(zScore(m.ratio, b.ratio));
+  const allZ = [...postureZs, Math.abs(onsetZ), zRatio].filter(isFiniteNum);
   const worstSigma = allZ.length ? Math.max(...allZ) : 0;
 
-  return { score, consistency, sequencing, rhythm, range, onsetZ, worstSigma };
+  // Per-metric |z| map -- fed to the self-optimisation accumulator for inspection.
+  const absZ = {
+    catchLean: zCatch, finishLean: zFinish, kneeMin: zKneeMin, kneeMax: zKneeMax,
+    strokeLen: zLen, ratio: zRatio, seqOnset: Math.abs(onsetZ),
+  };
+
+  return { score, consistency, sequencing, rhythm, range, onsetZ, worstSigma, absZ };
 }
 
 // ===========================================================================
@@ -2082,31 +2636,35 @@ let _affirmIdx = 0;
 
 /** Detect the candidate deviation class for THIS stroke (or null if clean).
  *  Returns the single worst/priority class so we never stack cues. Priority:
- *  sequencing (the headline fault) > rhythm > catch posture > range. */
+ *  sequencing (the headline fault) > rhythm > catch posture > range.
+ *  All thresholds come from TH() -- the SELF-TUNED, confidence-widened values
+ *  (DEV_WARN / SEQ_ONSET_WARN), not fixed constants. */
 function detectDeviationClass(m, scored) {
   const b = S.baseline;
+  const devWarn = TH("devWarn");
+  const seqWarn = TH("seqOnset");
   // Sequencing: body opened earlier than the learned onset by a clear margin,
   // OR a structural body-before-legs. This is the priority coaching target.
   const onsetEarly = isFiniteNum(m.seqOnset) && isFiniteNum(b.seqOnset.med) &&
-                     (m.seqOnset < b.seqOnset.med - CFG.SEQ_ONSET_WARN);
-  if ((m.seq && m.seq.offender === "body") || (onsetEarly && zScore(m.seqOnset, b.seqOnset) <= -CFG.DEV_WARN * 0.6)) {
+                     (m.seqOnset < b.seqOnset.med - seqWarn);
+  if ((m.seq && m.seq.offender === "body") || (onsetEarly && zScore(m.seqOnset, b.seqOnset) <= -devWarn * 0.6)) {
     return "seq";
   }
   // Rhythm: drive:recovery away from baseline.
   const zr = zScore(m.ratio, b.ratio);
-  if (zr >= CFG.DEV_WARN) return "ratio_fast";     // recovery rushed (ratio too high)
-  if (zr <= -CFG.DEV_WARN) return "ratio_slow";    // drive sluggish (ratio too low)
+  if (zr >= devWarn) return "ratio_fast";     // recovery rushed (ratio too high)
+  if (zr <= -devWarn) return "ratio_slow";    // drive sluggish (ratio too low)
   // Catch compression / over-reach.
   const zkn = zScore(m.minKnee, b.kneeMin);
-  if (zkn <= -CFG.DEV_WARN) return "compress";     // knee closed further than normal
+  if (zkn <= -devWarn) return "compress";     // knee closed further than normal
   const zcl = zScore(m.catchLean, b.catchLean);
-  if (zcl >= CFG.DEV_WARN) return "open";          // leaning further forward than normal
+  if (zcl >= devWarn) return "open";          // leaning further forward than normal
   // Layback over-extension at the finish.
   const zfl = zScore(m.finishLean, b.finishLean);
-  if (zfl <= -CFG.DEV_WARN) return "layback";      // more layback than normal
+  if (zfl <= -devWarn) return "layback";      // more layback than normal
   // Range: short stroke length.
   const zln = zScore(m.strokeLen, b.strokeLen);
-  if (zln <= -CFG.DEV_WARN) return "short";
+  if (zln <= -devWarn) return "short";
   return null;
 }
 
@@ -2151,6 +2709,21 @@ function ratioStr(r) {
  * Calm-by-default; one cue only on a meaningful, recurring deviation.
  */
 function classifyStroke(m, scored) {
+  // --- SELF-MONITOR gate: if the read is unreliable, don't coach from garbage. ---
+  const conf = confidenceState();
+  if (conf === "verylow") {
+    // Too unsure to judge this stroke. Push a null class (so recurrence resets)
+    // and show a quiet "reading you..." rather than a fault.
+    pushCapped(_recentClasses, null, CFG.HISTORY);
+    return {
+      verdict: { level: "unsure", headline: "Reading you…", detail: "Can’t see you cleanly — checking framing & light." },
+      cueClass: null,
+    };
+  }
+  // When confidence is merely LOW, demand one extra recurrence before a cue fires
+  // (the thresholds are already widened via TH(); this adds patience on top).
+  const recurMin = CFG.RECUR_MIN + (conf === "low" ? 1 : 0);
+
   // What (if anything) did THIS stroke trip?
   const thisClass = detectDeviationClass(m, scored);
   pushCapped(_recentClasses, thisClass, CFG.HISTORY);
@@ -2159,14 +2732,14 @@ function classifyStroke(m, scored) {
   const recur = thisClass ? _recentClasses.filter((c) => c === thisClass).length : 0;
   const recurWindow = _recentClasses.length;
 
-  // Is the tripped class also LARGE (>= DEV_BAD) or structural? -> red-eligible.
+  // Is the tripped class also LARGE (>= self-tuned DEV_BAD) or structural? -> red-eligible.
   const isLarge = thisClass && (
-    (scored && isFiniteNum(scored.worstSigma) && scored.worstSigma >= CFG.DEV_BAD) ||
+    (scored && isFiniteNum(scored.worstSigma) && scored.worstSigma >= TH("devBad")) ||
     (m.seq && m.seq.offender === "body")
   );
 
   // ---- 1) Recurring + large -> RED (rare). The only path to red. ----
-  if (thisClass && recur >= CFG.RECUR_MIN && isLarge) {
+  if (thisClass && recur >= recurMin && isLarge) {
     const phrase = pickPhrase(thisClass) || PHRASES[thisClass][0];
     return {
       verdict: {
@@ -2179,7 +2752,7 @@ function classifyStroke(m, scored) {
   }
 
   // ---- 2) Recurring (but not large) -> AMBER, one rotated cue. ----
-  if (thisClass && recur >= CFG.RECUR_MIN) {
+  if (thisClass && recur >= recurMin) {
     const phrase = pickPhrase(thisClass);
     if (phrase) {
       return {
@@ -2372,8 +2945,6 @@ function refreshReferenceUI() {
     el.refTag.textContent = refSourceLabel() + (have && isFiniteNum(S.reference.score) ? ` · ${Math.round(S.reference.score)}` : "");
     el.refTag.classList.toggle("has-ref", have);
   }
-  // The HUD match chip only shows once we have a reference (and, ideally, a read).
-  if (el.hudMatch) el.hudMatch.style.display = (have && S.running) ? "block" : "none";
 }
 
 // ===========================================================================
@@ -2413,54 +2984,107 @@ function figureState() {
 function drawBackdrop(W, H) {
   // Show-video mode: clear to transparent, then lay a translucent dusk wash so
   // the camera feed reads as a DIM reference layer behind the neon figure (not a
-  // full-brightness video -- Dan doesn't want to watch himself). A faint grid
-  // still helps the figure read.
+  // full-brightness video -- Dan doesn't want to watch himself). A faint ground
+  // plane still helps the figure read.
   if (!stage.classList.contains("dimvideo")) {
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "rgba(7, 11, 16, 0.45)";     // dim wash over the live video
+    ctx.fillStyle = "rgba(13, 10, 24, 0.46)";    // dim indigo wash over the live video
     ctx.fillRect(0, 0, W, H);
-    drawFloorGrid(W, H, 0.5);
+    drawMVGround(W, H, 0.45);
     return;
   }
-  // Deep dusk vertical gradient.
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0,   "#0a1622");
-  g.addColorStop(0.45,"#0b1119");
-  g.addColorStop(1,   "#070b10");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  // Soft warm horizon glow low-centre (the "dusk" tint), subtle.
-  const horizonY = H * 0.72;
-  const rg = ctx.createRadialGradient(W * 0.5, horizonY, 0, W * 0.5, horizonY, Math.max(W, H) * 0.55);
-  rg.addColorStop(0, "rgba(36, 120, 150, 0.16)");
-  rg.addColorStop(1, "rgba(36, 120, 150, 0)");
-  ctx.fillStyle = rg;
-  ctx.fillRect(0, 0, W, H);
-
-  drawFloorGrid(W, H, 1);
+  drawMonumentValley(W, H);
 }
 
-/** Faint perspective floor grid below the horizon. `intensity` scales opacity
- *  (lower when drawn over the live video so the feed still reads). */
-function drawFloorGrid(W, H, intensity) {
-  const horizonY = H * 0.72;
+/** The Monument-Valley dusk composition: a soft layered sky (muted indigo ->
+ *  dusty rose -> peach low band), a calm low horizon, a soft sun/moon disc, and
+ *  a couple of minimal flat monolith planes silhouetted near the horizon. Flat,
+ *  serene, premium -- and deliberately LOW-CONTRAST so the cyan neon figure pops.
+ *  All gradients + a handful of paths; cheap enough to redraw every frame. */
+function drawMonumentValley(W, H) {
+  const horizonY = H * 0.74;
+
+  // --- Sky: indigo high -> violet -> dusty rose -> warm peach at the horizon ---
+  const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
+  sky.addColorStop(0.00, "#160f30");   // deep indigo zenith
+  sky.addColorStop(0.42, "#231641");   // violet
+  sky.addColorStop(0.74, "#6e3f5e");   // muted mauve
+  sky.addColorStop(0.90, "#b9728a");   // dusty rose
+  sky.addColorStop(1.00, "#e3a878");   // warm peach band at the horizon
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, horizonY);
+
+  // --- Soft sun/moon disc, sitting just above the horizon, right-of-centre ---
+  const sunX = W * 0.68, sunY = horizonY - H * 0.135, sunR = Math.min(W, H) * 0.085;
+  const halo = ctx.createRadialGradient(sunX, sunY, sunR * 0.2, sunX, sunY, sunR * 3.4);
+  halo.addColorStop(0, "rgba(255, 226, 188, 0.55)");
+  halo.addColorStop(0.4, "rgba(240, 180, 150, 0.18)");
+  halo.addColorStop(1, "rgba(240, 180, 150, 0)");
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(sunX, sunY, sunR * 3.4, 0, Math.PI * 2); ctx.fill();
+  const disc = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
+  disc.addColorStop(0, "rgba(255, 234, 205, 0.92)");
+  disc.addColorStop(1, "rgba(247, 198, 162, 0.85)");
+  ctx.fillStyle = disc;
+  ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2); ctx.fill();
+
+  // --- Minimal monolith planes: a few flat MV-style mesas near the horizon.
+  //     Drawn in a muted, slightly-darker indigo so they read as silhouettes and
+  //     never compete with the figure. Two side blocks + a slim distant pillar. ---
   ctx.save();
-  ctx.strokeStyle = "rgba(90, 150, 175, 0.10)";
-  ctx.lineWidth = Math.max(1, W / 900);
-  // Horizontals: spacing widens downward for a gentle ground-plane feel.
-  for (let i = 0; i <= 6; i++) {
-    const f = i / 6;
-    const y = horizonY + (H - horizonY) * (f * f);   // quadratic -> perspective
-    ctx.globalAlpha = (0.7 - f * 0.4) * intensity;
+  // Far-left broad mesa.
+  ctx.fillStyle = "rgba(36, 24, 64, 0.92)";
+  let bw = W * 0.26, bh = H * 0.20, bx = -W * 0.02, by = horizonY - bh;
+  ctx.fillRect(bx, by, bw, bh);
+  // a soft sunlit edge on its right face.
+  ctx.fillStyle = "rgba(150, 96, 120, 0.30)";
+  ctx.fillRect(bx + bw - Math.max(2, W * 0.006), by, Math.max(2, W * 0.006), bh);
+
+  // Right-side taller monolith (offset so the figure centre stays clear).
+  ctx.fillStyle = "rgba(30, 20, 56, 0.95)";
+  bw = W * 0.17; bh = H * 0.32; bx = W * 0.84; by = horizonY - bh;
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = "rgba(170, 108, 124, 0.28)";
+  ctx.fillRect(bx, by, Math.max(2, W * 0.006), bh);    // left face catches the dusk
+
+  // A slim distant pillar left-of-centre (depth).
+  ctx.fillStyle = "rgba(44, 30, 74, 0.70)";
+  bw = W * 0.045; bh = H * 0.14; bx = W * 0.30; by = horizonY - bh;
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.restore();
+
+  // --- The ground: a calm MV plane (flat dusk floor + a whisper of a grid) ---
+  const ground = ctx.createLinearGradient(0, horizonY, 0, H);
+  ground.addColorStop(0, "#3a2550");   // warm-ish plum at the horizon line
+  ground.addColorStop(0.5, "#1c1338");
+  ground.addColorStop(1, "#0d0a18");   // into the deep base
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, horizonY, W, H - horizonY);
+
+  // A soft contact glow where the ground meets the sky (the warm horizon line).
+  const hg = ctx.createLinearGradient(0, horizonY - H * 0.02, 0, horizonY + H * 0.05);
+  hg.addColorStop(0, "rgba(227, 168, 120, 0)");
+  hg.addColorStop(0.5, "rgba(227, 168, 120, 0.22)");
+  hg.addColorStop(1, "rgba(227, 168, 120, 0)");
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, horizonY - H * 0.02, W, H * 0.07);
+
+  drawMVGround(W, H, 1);
+}
+
+/** A faint MV-style ground plane below the horizon: just a few soft receding
+ *  lines for a sense of floor without the busy Tron grid. `intensity` scales
+ *  opacity (lower over live video). Replaces the old harsh perspective grid. */
+function drawMVGround(W, H, intensity) {
+  const horizonY = H * 0.74;
+  ctx.save();
+  ctx.strokeStyle = "rgba(150, 140, 200, 0.10)";
+  ctx.lineWidth = Math.max(1, W / 1000);
+  for (let i = 1; i <= 5; i++) {
+    const f = i / 5;
+    const y = horizonY + (H - horizonY) * (f * f);   // quadratic -> gentle perspective
+    ctx.globalAlpha = (0.55 - f * 0.38) * intensity;
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
-  // Verticals fanning slightly from a central vanishing point.
-  ctx.globalAlpha = 0.5 * intensity;
-  const vx = W * 0.5;
-  for (let i = -5; i <= 5; i++) {
-    const topX = vx + i * (W * 0.018);
-    const botX = vx + i * (W * 0.12);
-    ctx.beginPath(); ctx.moveTo(topX, horizonY); ctx.lineTo(botX, H); ctx.stroke();
   }
   ctx.restore();
 }
@@ -2620,13 +3244,13 @@ function alignReferenceToLive(ref, livePts, side) {
   return frame.map((p) => p ? [hipLive[0] + p[0] * bodyPx, hipLive[1] + p[1] * bodyPx] : null);
 }
 
-/** Which TRAJ_BONE (if any) is diverging from the reference beyond threshold?
- *  Returns the bone index to flare amber, or -1. Picks the bone whose endpoints
- *  carry the largest live divergence. */
+/** Which TRAJ_BONE (if any) is diverging from the reference beyond the SELF-
+ *  TUNED threshold (TH-"diverge")? Returns the bone index to flare amber, or -1.
+ *  Picks the bone whose endpoints carry the largest live divergence. */
 function divergingBone() {
   const d = S.liveDivergence;
   if (!d) return -1;
-  let worst = -1, worstV = CFG.DIVERGE_FLARE;
+  let worst = -1, worstV = TH("diverge");
   for (let bi = 0; bi < TRAJ_BONES.length; bi++) {
     const [a, b] = TRAJ_BONES[bi];
     const v = Math.max(isFiniteNum(d[a]) ? d[a] : 0, isFiniteNum(d[b]) ? d[b] : 0);
@@ -2719,19 +3343,32 @@ function attractLoop(ts) {
   const frame = traj.pts[i];
   // Replay uses the calm-teal palette; idle demo too (it's an attract preview).
   const label = S.replaying
-    ? `REPLAY · your best${isFiniteNum(traj.score) ? " · " + Math.round(traj.score) : ""}`
-    : "PREVIEW · this is the look";
+    ? `REPLAY · your ghost${isFiniteNum(traj.score) ? " · " + Math.round(traj.score) : ""}`
+    : "PREVIEW · row your ghost";
   renderCanonFigure(frame, TRON.good, label, -1);
+  // Keep the lean HUD coherent during the idle preview (not the full per-frame
+  // render -- just the score read, the idle/replay cue line + the self-tuning pip).
+  if (!S.running) {
+    if (!S.replaying) {
+      S.verdict = { level: "idle", headline: "Start rowing", detail: "Sit side-on, full body in frame — then row your ghost." };
+    } else {
+      S.verdict = { level: "good", headline: "Studying your ghost", detail: "This is the best stroke you’re rowing to match." };
+    }
+    renderRing(); renderVerdict(); renderSelfTune();
+  }
   _attractRAF = requestAnimationFrame(attractLoop);
 }
 
-/** Start the idle/attract loop (idempotent). */
+/** Start the idle/attract loop (idempotent). Marks the stage as a DEMO so the
+ *  lean HUD (the score read + the self-tuning pip) is visible without a camera. */
 function startAttract() {
+  if (!S.running) stage.classList.add("demo");
   if (_attractRAF) return;
   _attractT0 = 0;
   _attractRAF = requestAnimationFrame(attractLoop);
 }
 function stopAttract() {
+  stage.classList.remove("demo");
   if (_attractRAF) { cancelAnimationFrame(_attractRAF); _attractRAF = 0; }
 }
 
@@ -2813,7 +3450,7 @@ function scoreBand(score) {
   return { cls: "bad", color: "var(--red)", label: "ragged" };
 }
 
-/** Paint the hero quality ring (arc + number + label). Smooth, never strobing. */
+/** Paint the minimal score read (arc + number + small label). Never strobing. */
 function renderRing() {
   // During calibration the ring shows the learning state, not a score.
   if (S.calState !== "ready" || !isFiniteNum(S.score)) {
@@ -2822,13 +3459,14 @@ function renderRing() {
       el.ringProg.style.stroke = "var(--aqua-deep)";
       el.ringProg.style.strokeDashoffset = String(RING_CIRC * (1 - frac));
       el.ringScore.innerHTML = `${S.calCount}<span class="pt">/${CFG.CALIB_STROKES}</span>`;
-      el.ringLabel.textContent = "learning you";
+      el.ringLabel.textContent = "learning";
       el.ringWrap.classList.remove("good");
     } else {
       el.ringProg.style.stroke = "var(--aqua-deep)";
       el.ringProg.style.strokeDashoffset = String(RING_CIRC);
       el.ringScore.textContent = "–";
-      el.ringLabel.textContent = S.calState === "warmup" ? "settling" : "form score";
+      el.ringScore.style.color = "var(--aqua)";
+      el.ringLabel.textContent = S.calState === "warmup" ? "settling" : "form";
       el.ringWrap.classList.remove("good");
     }
     return;
@@ -2844,24 +3482,53 @@ function renderRing() {
   el.ringWrap.classList.toggle("good", sc >= 65);
 }
 
-/** Apply the stable per-stroke verdict to both the panel cue and the HUD verdict. */
+/** Apply the stable per-stroke verdict to BOTH the (tucked-away) panel cue and
+ *  the single on-stage cue line. The cue line appears only when there's
+ *  something to say and FADES OUT when calm/good (the figure carries it). */
 function renderVerdict() {
   const v = S.verdict || { level: "idle", headline: "…", detail: "" };
-  // Panel cue.
-  el.cue.className = "cue " + (v.level || "idle");
+  // Panel cue (inside the sheet).
+  el.cue.className = "cue " + (v.level === "unsure" ? "learn" : (v.level || "idle"));
   el.cueText.textContent = v.headline || "…";
   el.cueSub.textContent = v.detail || "";
   // Coach pill summarises tone.
-  const tone = v.level === "bad" ? "fault" : v.level === "warn" ? "1 cue" : v.level === "learn" ? "learning" : "calm";
+  const tone = v.level === "bad" ? "fault" : v.level === "warn" ? "1 cue"
+             : v.level === "learn" ? "learning" : v.level === "unsure" ? "reading…" : "calm";
   el.coachPill.textContent = tone;
   el.coachPill.className = "pill" + (v.level === "warn" || v.level === "bad" ? " warn" : "");
-  // HUD verdict line.
-  el.hudCue.className = "verdict-line " + (v.level || "idle");
+
+  // The single on-stage cue line.
+  el.hudCue.className = "cue-line " + (v.level || "idle");
   el.hudCue.textContent = v.headline || "…";
-  const sub = document.createElement("span");
-  sub.className = "sub";
-  sub.textContent = v.detail || "";
-  el.hudCue.appendChild(sub);
+  if (v.detail) {
+    const sub = document.createElement("span");
+    sub.className = "sub";
+    sub.textContent = v.detail;
+    el.hudCue.appendChild(sub);
+  }
+  // Show it only when there's something to say; fade when calm/good. A steady,
+  // dialled-in stroke leaves the screen quiet -- just the figure + the score.
+  const speak = (v.level === "warn" || v.level === "bad" || v.level === "learn"
+              || v.level === "unsure" || v.level === "idle");
+  el.hudCue.classList.toggle("show", !!speak && (S.running || stage.classList.contains("demo")));
+}
+
+/** The small, calm self-tuning + confidence indicator on the stage, plus its
+ *  debug detail. Frames it as the coach learning ITSELF, dims when unsure. */
+function renderSelfTune() {
+  if (!el.selftune) return;
+  const conf = isFiniteNum(S.confidence) ? S.confidence : 1;
+  const cstate = confidenceState();
+  // Copy: while learning its own thresholds it says "calibrating"; once tuned,
+  // "self-tuned"; when unsure of the read, "reading you".
+  let label;
+  if (cstate !== "ok") label = "reading you";
+  else if (S.tuned && S.tuned.source === "self-tuned") label = "self-tuned";
+  else if (metaReady()) label = "self-tuning";
+  else label = "learning itself";
+  el.stLabel.textContent = label;
+  el.stConf.textContent = Math.round(conf * 100) + "%";
+  el.selftune.classList.toggle("lowconf", cstate !== "ok");
 }
 
 /** Paint the LEGS -> BODY -> ARMS sequencing strip from the last stroke. Only
@@ -2893,8 +3560,9 @@ function renderSequencing() {
 /** Paint the trend dots (last verdicts, oldest -> newest, right-aligned). */
 function renderTrend() {
   const dots = el.trend.querySelectorAll(".tdot");
-  // Map the "learn" level to a neutral (no class) dot so calibration reads calm.
-  const recent = S.verdicts.slice(-dots.length).map((l) => (l === "learn" || l === "idle") ? null : l);
+  // Map learn / idle / unsure to a neutral (no class) dot so calibration + low-
+  // confidence strokes read calm rather than as faults.
+  const recent = S.verdicts.slice(-dots.length).map((l) => (l === "learn" || l === "idle" || l === "unsure") ? null : l);
   const pad = dots.length - recent.length;
   dots.forEach((d, i) => {
     const idx = i - pad;
@@ -2961,6 +3629,39 @@ function renderDebug() {
   el.bvRatio.textContent      = bstat(b && b.ratio);
   el.bvSeqOnset.textContent   = (b && b.seqOnset && isFiniteNum(b.seqOnset.med)) ? `${pct(b.seqOnset.med)} ±${round(b.seqOnset.sd*100)}%` : "–";
 
+  // --- v4 self-tuning block: confidence + the auto-tuned thresholds ---
+  const t = S.tuned;
+  el.tvConf.textContent   = isFiniteNum(S.confidence) ? Math.round(S.confidence * 100) + "%" : "–";
+  el.tvVis.textContent    = isFiniteNum(S.visQuality) ? Math.round(S.visQuality * 100) + "%" : "–";
+  el.tvStab.textContent   = isFiniteNum(S.segStability) ? Math.round(S.segStability * 100) + "%" : "–";
+  el.tvSamples.textContent= S.meta ? String(S.meta.devSigma.length) : "0";
+  el.tvStatus.textContent = metaReady() ? (t && t.source === "self-tuned" ? "self-tuned" : "tuning")
+                          : `cold-start (${S.meta ? S.meta.devSigma.length : 0}/${CFG.META_MIN_SAMPLES})`;
+  el.tvTarget.textContent = Math.round(CFG.TARGET_FIRE_RATE * 100) + "%";
+  const obs = observedFireRate();
+  el.tvObserved.textContent = isFiniteNum(obs) ? Math.round(obs * 100) + "%" : "–";
+  el.tvDevWarn.textContent  = t ? `${round(t.devWarn, 2)}σ (anchor ${CFG.DEV_WARN})` : `${CFG.DEV_WARN}σ (anchor)`;
+  el.tvDevBad.textContent   = t ? `${round(t.devBad, 2)}σ (anchor ${CFG.DEV_BAD})` : `${CFG.DEV_BAD}σ (anchor)`;
+  el.tvSeq.textContent      = t ? `${round(t.seqOnset, 3)} (anchor ${CFG.SEQ_ONSET_WARN})` : `${CFG.SEQ_ONSET_WARN} (anchor)`;
+  el.tvDiverge.textContent  = t ? `${round(t.diverge, 3)} (anchor ${CFG.DIVERGE_FLARE})` : `${CFG.DIVERGE_FLARE} (anchor)`;
+  el.tvClose.textContent    = t ? `${round(t.close, 3)} (anchor ${CFG.CLOSE_FALLOFF})` : `${CFG.CLOSE_FALLOFF} (anchor)`;
+
+  // --- v4 accumulated distributions (rolling, capped) ---
+  const m = S.meta;
+  if (m) {
+    el.dxDevN.textContent  = String(m.devSigma.length);
+    el.dxDevP.textContent  = m.devSigma.length ? `${round(percentile(m.devSigma, 0.5), 2)} / ${round(percentile(m.devSigma, 1 - CFG.TARGET_FIRE_RATE), 2)}` : "–";
+    el.dxOnsetN.textContent= String(m.onsetDelta.length);
+    const early = m.onsetDelta.filter((v) => isFiniteNum(v) && v > 0);
+    el.dxOnsetP.textContent= early.length ? round(percentile(early, 1 - CFG.TARGET_FIRE_RATE), 3) : "–";
+    el.dxDivN.textContent  = String(m.divergence.length);
+    el.dxDivP.textContent  = m.divergence.length ? round(percentile(m.divergence, 0.80), 3) : "–";
+    el.dxMatchP.textContent= m.match.length ? round(percentile(m.match, 0.5), 0) + "%" : "–";
+    el.dxBest.textContent  = `+${round(m.bestDrift || 0, 1)} pts (cap ${CFG.BEST_DRIFT_CAP})`;
+    const fk = Object.keys(m.faults || {});
+    el.dxFaults.textContent= fk.length ? fk.map((k) => `${k}:${m.faults[k]}`).join("  ") : "none yet";
+  }
+
   // Per-stroke log table (newest first).
   const rows = S.strokeLog.slice().reverse();
   if (!rows.length) {
@@ -3009,7 +3710,7 @@ function renderUI() {
     el.bar.style.background = c >= 70 ? "var(--aqua)" : c >= 50 ? "var(--amber)" : "var(--red)";
   }
 
-  // v3: match-to-best (closeness). Panel metric + HUD chip. "–" until we have one.
+  // Match-to-ghost (closeness). Panel metric only. "–" until we have one.
   const matchVal = isFiniteNum(S.closeness) ? Math.round(S.closeness) : null;
   if (matchVal == null) {
     el.match.textContent = "–";
@@ -3019,27 +3720,23 @@ function renderUI() {
     el.matchBar.style.width = matchVal + "%";
     el.matchBar.style.background = matchVal >= 85 ? "var(--aqua)" : matchVal >= 65 ? "var(--amber)" : "var(--red)";
   }
-  if (el.hudMatchVal) el.hudMatchVal.textContent = matchVal == null ? "–" : matchVal + "%";
 
-  // Hero ring + the stable per-stroke verdict (panel + HUD).
+  // The lean HUD: score read + the one cue line + the self-tuning pip.
   renderRing();
   renderVerdict();
+  renderSelfTune();
+  // Tucked-away panel widgets (cheap; only meaningful when the sheet's open).
   renderSequencing();
   renderTrend();
 
-  // Calibration progress bar under the ring (shown only while learning).
+  // Calibration progress bar low-centre on the stage (shown only while learning).
   if (S.calState === "learning") {
-    el.calib.style.display = "flex";
+    el.calib.classList.add("show");
     el.calibBar.style.width = clamp(S.calCount / CFG.CALIB_STROKES, 0, 1) * 100 + "%";
+    if (el.calibLabel) el.calibLabel.textContent = `learning your stroke · ${S.calCount}/${CFG.CALIB_STROKES}`;
   } else {
-    el.calib.style.display = "none";
+    el.calib.classList.remove("show");
   }
-
-  // HUD live bits (SPM + phase only).
-  el.hudSpm.textContent = rOr(spm);
-  const phaseTxt = S.phase === "idle" ? "READY" : S.phase.toUpperCase();
-  el.hudPhase.innerHTML = `<span class="pdot"></span>${phaseTxt}`;
-  el.hudPhase.className = "hud-phase" + (S.phase === "drive" ? " drive" : S.phase === "recovery" ? " recovery" : "");
 
   renderDebug();
 }
@@ -3087,6 +3784,12 @@ function processPose(lm, t) {
 
   const j = sideJoints(lm, side);
   S.visOk = j.ok;
+
+  // SELF-MONITOR: update detection confidence from the visibility of the core
+  // side joints (shoulder/hip/knee/ankle) + segmentation stability. Done every
+  // frame so the indicator + the threshold-widening track the read continuously.
+  const visScore = (p) => (p && isFiniteNum(p.visibility) ? p.visibility : 0);
+  updateConfidence([visScore(j.sh), visScore(j.hip), visScore(j.knee), visScore(j.ankle)]);
 
   if (!j.ok) {
     drawSkeleton(lm, side, false);
@@ -3181,11 +3884,15 @@ function updateLiveDivergence() {
   const ref = S.reference.pts[idx];
   if (!ref) return;
   const dist = new Array(6).fill(NaN);
+  let worst = 0;
   for (let k = 0; k < 6; k++) {
     const pa = cf[k], pb = ref[k];
-    if (pa && pb) dist[k] = Math.hypot(pa[0] - pb[0], pa[1] - pb[1]);
+    if (pa && pb) { dist[k] = Math.hypot(pa[0] - pb[0], pa[1] - pb[1]); if (dist[k] > worst) worst = dist[k]; }
   }
   S.liveDivergence = dist;
+  // Track the worst divergence this stroke -> fed to the self-tuning accumulator
+  // so DIVERGE_FLARE can be set from his own divergence distribution.
+  if (worst > 0) S.strokeMaxDivergence = isFiniteNum(S.strokeMaxDivergence) ? Math.max(S.strokeMaxDivergence, worst) : worst;
 }
 
 // ===========================================================================
@@ -3356,6 +4063,7 @@ async function start() {
   S.running = true;
   S.sessionStart = performance.now();
   stage.classList.add("running");
+  stage.classList.remove("demo");          // leaving the idle preview
   startBtn.textContent = "Stop";
   startBtn.classList.add("stop");
   recalibBtn.disabled = false;
@@ -3365,9 +4073,14 @@ async function start() {
   S.replaying = false;
   stopAttract();
   refreshReferenceUI();
+  // v4: this session hasn't yet contributed to the meta accumulator + reset the
+  // live confidence so it re-earns trust from this session's read.
+  _metaSessionCounted = false;
+  S.confidence = 0.6; S.visQuality = 0.6; S.segStability = 0.5;
+  recomputeAdaptiveThresholds(false);      // refresh tuned thresholds from stored meta
   // Fresh verdict + begin calibration at session start.
   beginCalibration();
-  S.verdict = { level: "learn", headline: "Settling in", detail: "Find your rhythm — I'm about to learn your stroke." };
+  S.verdict = { level: "learn", headline: "Settling in", detail: "Find your rhythm — GHOST is about to learn your stroke." };
   lastVideoTime = -1;
   requestAnimationFrame(loop);
 }
@@ -3388,10 +4101,12 @@ function stop() {
   // v3: clear live trails + drop back to the idle Tron preview.
   S.trail = []; S.barPath = []; S.liveDivergence = null;
   refreshReferenceUI();
+  // v4: let the best-score bar drift up a touch if he rowed well (anchored).
+  noteBestDriftForSession();
   startAttract();
   // Save this session's summary (numbers only) before tearing down.
   commitSessionSummary();
-  showOverlay("Stopped", "Camera is off and the live feed has stopped. Your session summary (numbers only) is saved on this device.");
+  showOverlay("Session saved", "Camera off, feed stopped. Your summary, your ghost, and what GHOST learned about its own sensitivity are saved on this device (numbers only).");
 }
 
 /** Begin (or restart) the calibration learning window. */
@@ -3428,6 +4143,9 @@ function resetMetrics() {
     strokeFrames: [], curFrameJoints: null, curFinishT: null, lastTraj: null,
     trail: [], barPath: [], liveDivergence: null,
     closeness: NaN, lastCloseness: NaN, closenessHistory: [],
+    // v4: re-earn confidence from the new geometry; the accumulated META is KEPT
+    // (the coach's self-knowledge carries across side/camera changes).
+    confidence: 0.6, visQuality: 0.6, segStability: 0.5, strokeMaxDivergence: NaN,
   });
   beginCalibration();
   refreshReferenceUI();
@@ -3439,11 +4157,31 @@ function resetMetrics() {
 // ---------------------------------------------------------------------------
 startBtn.addEventListener("click", () => { S.running ? stop() : start(); });
 
+// The single menu -> the slide-up sheet (everything that isn't the hero).
+function openSheet() {
+  sheet.classList.add("open");
+  sheetScrim.classList.add("open");
+  sheet.setAttribute("aria-hidden", "false");
+  menuBtn.classList.add("active");
+  if (el.debug.open) renderDebug();      // freshen any open debug panel
+}
+function closeSheet() {
+  sheet.classList.remove("open");
+  sheetScrim.classList.remove("open");
+  sheet.setAttribute("aria-hidden", "true");
+  menuBtn.classList.remove("active");
+}
+function toggleSheet() { sheet.classList.contains("open") ? closeSheet() : openSheet(); }
+menuBtn.addEventListener("click", toggleSheet);
+sheetClose.addEventListener("click", closeSheet);
+sheetScrim.addEventListener("click", closeSheet);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet.classList.contains("open")) closeSheet(); });
+
 // Recalibrate: re-learn the user's normal without ending the session.
 recalibBtn.addEventListener("click", () => {
   beginCalibration();
   S.verdict = { level: "learn", headline: "Re-learning your stroke", detail: "Row naturally for a few strokes." };
-  renderUI();
+  if (S.running) renderUI();
 });
 
 flipBtn.addEventListener("click", () => {
@@ -3503,13 +4241,20 @@ viewBtn.addEventListener("click", () => {
   S.trail = []; S.barPath = [];
 });
 
-// Clear best stroke: forget the reference + its stored copy (numbers-only).
+// Clear ghost: forget the reference + its stored copy (numbers-only).
 clearRefBtn.addEventListener("click", () => {
   clearReference();
-  el.histNote.textContent = "Best-stroke reference cleared. The next strong stroke becomes your new best.";
+  el.histNote.textContent = "Ghost cleared. The next strong stroke becomes your new best to chase.";
 });
 
-// "Copy log" -- copies the per-stroke log + learned baseline as JSON.
+// Reset self-tuning: forget what the coach learned about its OWN sensitivity.
+clearTuneBtn.addEventListener("click", () => {
+  clearMeta();
+  el.histNote.textContent = "Self-tuning reset. GHOST is back to its default sensitivity and will re-learn its thresholds from your next strokes.";
+  if (el.debug.open) renderDebug();
+});
+
+// "Copy log" -- copies the per-stroke log + learned baseline + self-tuned state.
 el.copyLogBtn.addEventListener("click", async () => {
   const payload = JSON.stringify({
     baseline: S.baseline || S.baselineSeed || null,
@@ -3519,6 +4264,19 @@ el.copyLogBtn.addEventListener("click", async () => {
     reference: S.reference || null,
     refSource: S.refSource,
     closenessHistory: S.closenessHistory.map((v) => round(v)),
+    // v4: the self-tuned thresholds + a compact summary of the accumulated
+    // distributions the coach tunes itself from (numbers only).
+    tuned: S.tuned,
+    confidence: round(S.confidence, 3),
+    targetFireRate: CFG.TARGET_FIRE_RATE,
+    observedFireRate: round(observedFireRate(), 3),
+    meta: S.meta ? {
+      scoredStrokes: S.meta.scoredStrokes, sessions: S.meta.sessions,
+      devSigmaN: S.meta.devSigma.length,
+      devSigmaP50: round(percentile(S.meta.devSigma, 0.5), 2),
+      devSigmaPtarget: round(percentile(S.meta.devSigma, 1 - CFG.TARGET_FIRE_RATE), 2),
+      faults: S.meta.faults, bestDrift: round(S.meta.bestDrift || 0, 1),
+    } : null,
     strokes: S.strokeLog,
   }, null, 2);
   let ok = false;
@@ -3552,10 +4310,13 @@ document.addEventListener("visibilitychange", () => {
 });
 
 // ---------------------------------------------------------------------------
-//  Boot: restore baseline seed + reference + history, start the idle preview.
+//  Boot: restore baseline seed + reference + history + the self-tuning meta,
+//  derive the active thresholds, and start the idle preview.
 // ---------------------------------------------------------------------------
 loadBaselineSeed();
 loadReferenceSeed();        // v3: restore the best-stroke reference (numbers only)
+loadMeta();                 // v4: restore accumulated distributions (numbers only)
+recomputeAdaptiveThresholds(true);   // derive S.tuned from the restored meta (or sit on anchors)
 renderProgress();
 
 // Honour prefers-reduced-motion: trims the Tron motion trail + glow pulse, keeps
