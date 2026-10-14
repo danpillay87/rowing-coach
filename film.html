@@ -195,13 +195,14 @@ const CFG = {
   MIN_HALF_MS: 250,      // min time between a catch and a finish
   SWING_FRAC: 0.4,       // each extreme must be >= 40% of the local amplitude from the last opposite one
   /* The hip sits near each extreme for a few hundred ms (at the finish: hands away + body rock-over before the slide
-     starts; at the catch: the slide often stalls just short of full compression), so the raw argmax / argmin of the
-     hip signal lands anywhere in that plateau. On a recorded clip we can look back, so BOTH the catch and the finish
-     are moved to when the hip FIRST arrives within 4% of the stroke's swing of its extreme. One definition of "catch"
-     is used for everything: it closes the previous stroke AND opens the next one. The live coach can't look back,
-     which is why it doesn't do this. */
+     starts; at the catch: the slide stalls at full compression for ~0.25 s while the hands are already forward), so the
+     raw argmax / argmin of the hip signal lands anywhere in that plateau. On a recorded clip we can look ahead, so each
+     extreme is moved to the plateau edge that matches what a coach means by it: the FINISH is when the hip FIRST arrives
+     within 4% of the stroke's swing of its trough (the drive is over), the CATCH is the LAST sample still within 4% of
+     its peak (the drive starts, so the hold counts as recovery). One definition of "catch" is used for everything: it
+     closes the previous stroke AND opens the next one. The live coach can't look ahead, which is why it doesn't do this. */
   FINISH_ARRIVE_FRAC: 0.04,
-  CATCH_ARRIVE_FRAC: 0.04,
+  CATCH_LEAVE_FRAC: 0.04,
   /* Amplitude gate, in TORSO LENGTHS (median shoulder->hip distance in px) instead of the live coach's
      0.04 of frame width. On an erg the hip slides well over a torso-length per stroke (~0.7 m of seat travel
      vs ~0.5 m torso) while idle sway / pose jitter stays under ~0.1. The live gate (0.04 of frame width) is
@@ -214,21 +215,30 @@ const CFG = {
   SIDE_LOCK_MS: 1000,    // side (left/right-facing) is decided from the first second of posed frames
   SAMPLE_MS: 1000 / 30,  // sample at <= 30 fps
   /* ---- sequencing (legs -> body -> arms) ----
-     Measured after segmentation, per stroke, on the stored traces. Each of legs (knee opening), body (trunk opening)
-     and arms (wrist->shoulder distance shrinking) is turned into an "engagement" signal that RISES during the drive.
-     A segment has "gone" when its signal has climbed SEQ_GO_FRAC of its OWN drive excursion above its running trough
-     and stays there for SEQ_PERSIST_MS. Fixed absolute thresholds (index.html's 12% of leg range / 4 deg / 0.04 torso)
-     are not comparable across segments (a 4 deg trunk wobble or a straight arm tilting is ~0.04 torso, far less
-     effort than 12% of the knee range), and a catch that is a few frames early or late left them measuring
-     against the wrong baseline. The trough is searched from SEQ_PRE_MS before the catch so a lean or arm peak that
-     slightly leads/lags the hip catch is still found. */
-  SEQ_GO_FRAC: 0.15,
-  SEQ_PERSIST_MS: 100,   // the change must hold this long (rejects a noise spike at the catch)
-  SEQ_PRE_MS: 200,       // trough search starts this long before the catch
-  SEQ_POST_MS: 200,      // extremes are looked for up to this long past the hip's finish (capped at 30% of the recovery)
-  SEQ_MIN_EXC_LEGS: 15,  // deg of knee opening a drive must show before "legs" counts as having moved at all
-  SEQ_MIN_EXC_BODY: 8,   // deg of trunk opening
-  SEQ_MIN_EXC_ARMS: 0.10, // wrist->shoulder distance change, in TORSO LENGTHS (scale-free in pixel space)
+     Measured after segmentation, per stroke, on the stored traces. Each of legs (hip travel away from the feet = the
+     seat sliding), body (trunk opening) and arms (elbow flexing) is turned into an "engagement" signal that RISES
+     during the drive. A segment has "gone" when its signal has climbed a fraction of its OWN drive excursion above its
+     running trough and stays there for SEQ_PERSIST_MS. Fixed absolute thresholds (index.html's 12% of leg range /
+     4 deg / 0.04 torso) are not comparable across segments, so each segment is measured against its own range.
+     Two things the real (Mixkit erg) clip taught us:
+       - Arms: the wrist->shoulder distance shrinks ~30% of its range BEFORE the elbows bend (the straight arm just
+         rides the swinging torso), so it fires far too early. The ELBOW ANGLE only changes when the arms really pull,
+         but it still drifts ~15% of its range as the shoulder girdle moves, hence the higher SEQ_GO_FRAC_ARMS.
+       - Legs: the knee angle opens slowly at first (a few degrees while the seat has already moved 7% of its travel),
+         so it reads late; hip travel from the feet is when the seat actually starts to roll.
+     Legs and trunk usually start within ~3 frames of each other, which a 30 fps pose track cannot order reliably, so
+     a segment only counts as leading another if it leads by more than SEQ_TIE_MS per step of the legs>body>arms rank
+     (a near-tie is read as the textbook order). The trough is searched from SEQ_PRE_MS before the catch hold begins, so
+     a segment that starts while the hip is still stalled at full compression (arms-first / body-first) is still seen. */
+  SEQ_GO_FRAC: 0.15,        // legs + body
+  SEQ_GO_FRAC_ARMS: 0.25,   // arms (elbow angle drifts up to ~15% of its range before the pull)
+  SEQ_PERSIST_MS: 100,      // the change must hold this long (rejects a noise spike at the catch)
+  SEQ_TIE_MS: 100,          // onsets closer than this are a tie, read as the canonical order (see above)
+  SEQ_PRE_MS: 200,          // trough search starts this long before the catch hold begins (first arrival at the catch)
+  SEQ_POST_MS: 200,         // extremes are looked for up to this long past the hip's finish (capped at 30% of the recovery)
+  SEQ_MIN_EXC_LEGS: 0.30,   // hip travel (in TORSO LENGTHS) a drive must show before "legs" counts as having moved at all
+  SEQ_MIN_EXC_BODY: 8,      // deg of trunk opening
+  SEQ_MIN_EXC_ARMS: 20,     // deg of elbow flexion
   // ---- summary ----
   DEV_WARN: 2.0,         // robust-SDs from the clip median that flag a stroke
 };
@@ -340,16 +350,16 @@ function median5(arr) {
   }
   return out;
 }
-/** Wrist->shoulder horizontal distance in torso lengths (scale-free: pixel x and pixel torso share units). */
-function armCloseness(j) {
-  if (!isFiniteNum(j.wrist.x)) return NaN;
-  return Math.abs(j.wrist.x - j.sh.x) / Math.max(1, Math.hypot(j.sh.x - j.hip.x, j.sh.y - j.hip.y));
-}
+/** Elbow interior angle (deg) in pixel space: ~straight (large) with the arm extended, small when the elbow is bent. */
+function elbowAngle(j) { return angleDeg(j.sh.x, j.sh.y, j.elbow.x, j.elbow.y, j.wrist.x, j.wrist.y); }
 
-/** Legs -> body -> arms engagement order for one drive. `t*` are absolute ms (or null); onsets are seconds after the catch. */
+/** Legs -> body -> arms engagement order for one drive. `t*` are absolute ms (or null); onsets are seconds after the catch.
+ *  Ordering uses t + rank * SEQ_TIE_MS, so a segment must lead the next one in the canonical order by more than the tie
+ *  window per rank step to be listed ahead of it (near-ties read as legs>body>arms). `onsets` stay the raw times. */
 function buildSequence(tLegs, tBody, tArms, tCatch) {
   const all = [["legs", tLegs, 0], ["body", tBody, 1], ["arms", tArms, 2]];
-  const items = all.filter((it) => it[1] != null).sort((p, q) => p[1] - q[1] || p[2] - q[2]);
+  const key = (it) => it[1] + it[2] * CFG.SEQ_TIE_MS;
+  const items = all.filter((it) => it[1] != null).sort((p, q) => key(p) - key(q) || p[2] - q[2]);
   const onsets = {};
   for (const [name, t] of all) onsets[name] = t == null ? null : rnd((t - tCatch) / 1000, 3);
   // Correct = legs lead and every later segment has a higher rank (legs < body < arms). Unknown if nothing fired.
@@ -357,10 +367,11 @@ function buildSequence(tLegs, tBody, tArms, tCatch) {
   return { order: items.map((it) => it[0]), onsets, correct };
 }
 
-/** Sample index at which an engagement signal e (it RISES during the drive) has climbed CFG.SEQ_GO_FRAC of its own
- *  excursion above its running trough and stayed there for CFG.SEQ_PERSIST_MS. Searches samples lo..hi; returns -1
- *  when the segment barely moved (excursion < minExc). The excursion runs from the trough to the signal's peak. */
-function onsetIndex(t, e, lo, hi, minExc) {
+/** Sample index at which an engagement signal e (it RISES during the drive) has climbed `goFrac` (default
+ *  CFG.SEQ_GO_FRAC) of its own excursion above its running trough and stayed there for CFG.SEQ_PERSIST_MS. Searches
+ *  samples lo..hi; returns -1 when the segment barely moved (excursion < minExc). The excursion runs from the trough to
+ *  the signal's peak. */
+function onsetIndex(t, e, lo, hi, minExc, goFrac = CFG.SEQ_GO_FRAC) {
   let pk = -1;
   for (let i = lo; i <= hi; i++) if (isFiniteNum(e[i]) && (pk < 0 || e[i] > e[pk])) pk = i;
   if (pk < 0) return -1;
@@ -368,7 +379,7 @@ function onsetIndex(t, e, lo, hi, minExc) {
   for (let i = lo; i <= pk; i++) if (isFiniteNum(e[i]) && e[i] < trough) trough = e[i];
   const exc = e[pk] - trough;
   if (!(exc >= minExc)) return -1;
-  const thr = CFG.SEQ_GO_FRAC * exc;
+  const thr = goFrac * exc;
   let run = Infinity;                                // running trough: follows any early dip, so only a real rise counts
   for (let i = lo; i <= pk; i++) {
     if (!isFiniteNum(e[i])) continue;
@@ -388,7 +399,8 @@ function onsetIndex(t, e, lo, hi, minExc) {
  * finish() once. Each uninterrupted run of frames (a pose gap longer than GAP_MS ends a run) is processed in one go:
  *   1. Signal: compression = -|hip.x - feetX| (px), smoothed with zero lag. Alternating peaks (CATCH, most compressed)
  *      and troughs (FINISH) are found with a swing hysteresis, so a catch is exactly one event, never a chain of them.
- *   2. Each extreme is moved to when the hip FIRST arrives within X% of its swing of that extreme (see CFG).
+ *   2. Each extreme is moved to the edge of its plateau: the finish to when the hip FIRST arrives within X% of its swing
+ *      of the trough, the catch to the LAST sample within X% of the peak (the drive start; see CFG).
  *   3. Stroke k = catch k -> finish k -> catch k+1, all taken from that SAME refined list, so
  *      period = nextCatchT - catchT, recoveryS = nextCatchT - finishT, driveS = finishT - catchT, and a stroke's
  *      nextCatchT is exactly the next stroke's catchT.
@@ -418,11 +430,12 @@ class StrokeDetector {
     this.lastGoodT = t;
     const feetX = feetXOf(lm, this.side, this.W, j);
     const wristOk = j.wrist.visibility >= CFG.VIS_DRAW;
+    const elbowOk = wristOk && j.elbow.visibility >= CFG.VIS_DRAW;
     this.smp.push({
       t,
       hip: -Math.abs(j.hip.x - feetX),               // closer to feet -> larger (the catch is a maximum)
       lean: trunkLean(j, feetX), knee: kneeAngle(j),
-      arm: wristOk ? armCloseness(j) : NaN,
+      elbow: elbowOk ? elbowAngle(j) : NaN,
       wx: wristOk ? j.wrist.x : NaN,
     });
     return true;
@@ -469,8 +482,8 @@ class StrokeDetector {
     const sig = smoothZP(smp.map((s) => s.hip), CFG.EMA_SIG);
     const ext = this._extremes(t, sig);
     if (ext.length < 3) return;
-    // One refinement for every extreme: the first sample after the previous (opposite) extreme at which the hip is
-    // within ARRIVE_FRAC of this stroke half-cycle's swing of the extreme. e.i = raw extreme, e.a = arrival.
+    // One refinement for every extreme, against the swing of its half-cycle. e.i = raw extreme, e.a = the refined event
+    // time (finish: first arrival; catch: drive start), e.f = (catch only) when the hold at full compression began.
     const typical = median(ext.slice(1).map((e, k) => Math.abs(sig[e.i] - sig[ext[k].i])));
     for (let k = 0; k < ext.length; k++) {
       const e = ext[k], prev = k ? ext[k - 1] : null;
@@ -478,8 +491,15 @@ class StrokeDetector {
       const from = prev ? prev.i + 1 : 0;
       e.a = e.i;
       if (e.type === "catch") {
-        const thr = sig[e.i] - CFG.CATCH_ARRIVE_FRAC * swing;
-        for (let q = from; q <= e.i; q++) if (sig[q] >= thr) { e.a = q; break; }
+        // Catch = DRIVE START: the hip holds near full compression for a few hundred ms, so the catch is the LAST sample
+        // still inside the band (the moment the hip leaves it), not the first arrival. The hold is then in the
+        // recovery, not the drive.
+        const thr = sig[e.i] - CFG.CATCH_LEAVE_FRAC * swing;
+        const stop = k + 1 < ext.length ? ext[k + 1].i : n;      // never run into the finish
+        e.f = e.i; for (let q = from; q <= e.i; q++) if (sig[q] >= thr) { e.f = q; break; }   // hold starts (first arrival)
+        let q = stop - 1;
+        while (q > e.i && sig[q] < thr) q--;                     // scan back from the finish: robust to jitter inside the hold
+        e.a = q;                                                 // hold ends = drive starts
       } else {
         const thr = sig[e.i] + CFG.FINISH_ARRIVE_FRAC * swing;
         for (let q = from; q <= e.i; q++) if (sig[q] <= thr) { e.a = q; break; }
@@ -487,8 +507,9 @@ class StrokeDetector {
     }
     const lean = smoothZP(median5(smp.map((s) => s.lean)), CFG.EMA_FAST);
     const knee = smoothZP(median5(smp.map((s) => s.knee)), CFG.EMA_FAST);
-    const arm = smoothZP(median5(smp.map((s) => s.arm)), CFG.EMA_FAST);
-    const body = lean.map((v) => -v), arms = arm.map((v) => -v);   // engagement signals: rise as the segment goes
+    const elbow = smoothZP(median5(smp.map((s) => s.elbow)), CFG.EMA_FAST);
+    // engagement signals: each RISES as its segment goes (legs = hip moving away from the feet, body = trunk opening, arms = elbow flexing)
+    const legs = sig.map((v) => -v), body = lean.map((v) => -v), arms = elbow.map((v) => -v);
     for (let k = 0; k + 2 < ext.length; k++) {
       const c0 = ext[k], f0 = ext[k + 1], c1 = ext[k + 2];
       // A run's first catch counts only if the run visibly rose into it (a run that starts sitting at the catch has
@@ -504,24 +525,28 @@ class StrokeDetector {
         if (isFiniteNum(smp[q].wx)) { xMin = Math.min(xMin, smp[q].wx); xMax = Math.max(xMax, smp[q].wx); nx++; }
       }
       const travel = nx >= 3 ? xMax - xMin : NaN;                  // handle travel = wrist x spread over the drive (pixels here; divided by torso length when the stroke is built)
-      // Sequencing window: PRE before the catch to a little past the hip's extreme (never into the next catch).
-      let lo = c0.a; while (lo > 0 && t[c0.a] - t[lo - 1] <= CFG.SEQ_PRE_MS) lo--;
+      // Sequencing window: PRE before the catch HOLD begins (a segment that starts while the hip is still stalled at full
+      // compression must be seen) to a little past the hip's extreme (never into the next catch).
+      let lo = c0.f; while (lo > 0 && t[c0.f] - t[lo - 1] <= CFG.SEQ_PRE_MS) lo--;
       const post = Math.min(CFG.SEQ_POST_MS, 0.3 * (t[c1.a] - t[f0.i]));
       let hi = f0.i; while (hi + 1 < c1.a && t[hi + 1] - t[f0.i] <= post) hi++;
       const at = (i) => (i < 0 ? null : t[i]);
+      let catchLean = -Infinity;                                   // catch posture = most forward lean while the hip holds at full compression
+      for (let q = c0.f; q <= c0.a; q++) if (isFiniteNum(lean[q])) catchLean = Math.max(catchLean, lean[q]);
+      if (!isFiniteNum(catchLean)) catchLean = lean[c0.a];
       this.strokes.push({
         index: this.strokes.length + 1,
         catchT: tc, finishT: tf, nextCatchT: tn,
         period, spm: rnd(60 / period, 1),
         driveS, recoveryS, ratio: rnd(driveS / recoveryS, 2),
-        catchLeanDeg: rnd(lean[c0.a], 1),
+        catchLeanDeg: rnd(catchLean, 1),
         finishLeanDeg: rnd(lean[f0.a], 1),           // lean at the finish itself
         kneeMin: rnd(kMin, 1), kneeMax: rnd(kMax, 1),
         strokeLength: rnd(travel / this.torso, 2),
         sequence: buildSequence(
-          at(onsetIndex(t, knee, lo, hi, CFG.SEQ_MIN_EXC_LEGS)),
+          at(onsetIndex(t, legs, lo, hi, CFG.SEQ_MIN_EXC_LEGS * this.torso)),
           at(onsetIndex(t, body, lo, hi, CFG.SEQ_MIN_EXC_BODY)),
-          at(onsetIndex(t, arms, lo, hi, CFG.SEQ_MIN_EXC_ARMS)),
+          at(onsetIndex(t, arms, lo, hi, CFG.SEQ_MIN_EXC_ARMS, CFG.SEQ_GO_FRAC_ARMS)),
           t[c0.a]),
       });
     }
