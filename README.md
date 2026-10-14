@@ -223,6 +223,46 @@ clears it back to the defaults.
 
 ---
 
+## Film mode (`film.html`)
+
+The live coach watches you row and never records. **Film mode** is its
+after-the-fact sibling: give it a recorded side-on clip and it hands you back an
+annotated video. Open it from **⋯ → Film a session →**, or go straight to
+`film.html`.
+
+**How to use it**
+
+1. Film 30–90 s side-on (phone propped ~2–3 m away, whole body in frame, good
+   light), then drop the clip on the page or tap to choose it.
+2. Wait for the three passes (keep the tab open and in front):
+   **Analyse** (the clip plays once, muted, while the pose model tracks you) →
+   **Segment** (catches and finishes are found, strokes are measured) →
+   **Render** (the clip replays at 1× onto a canvas with the overlay, and is
+   recorded).
+3. Press the **Download** buttons for whatever you want to keep.
+
+**What you get**
+
+- `ghost-film.mp4` (or `.webm` where the browser can't record mp4): your clip
+  with the neon skeleton, a ~2 s handle trail, catch/finish flashes, and a stats
+  panel — live strokes/min, drive:recovery ratio, stroke *n*/*N*, DRIVE or
+  RECOVERY, the legs → body → arms strip, per-stroke bars, and *row your ghost*.
+- `stroke-card.png`: a 1080×1350 summary card (average rate, stroke count,
+  drive:recovery, rhythm, sequence-correct %, best stroke, every stroke as a bar).
+- `strokes.json`: the numbers — a `summary` plus one record per stroke (rate,
+  drive/recovery times, ratio, catch and finish lean, knee range, stroke length,
+  sequence order).
+
+Recorded clips need a few things the live coach doesn't: angles are computed in
+pixel space (so phone aspect ratios can't skew them), the stroke-size gate is
+scaled to your body size, left/right facing is locked after the first second,
+the detector resets after a pose gap longer than 0.5 s, and your baseline is the
+median of **all** strokes in the clip (no live warm-up). Test hooks for
+automation: `film.html?src=<same-origin path>&auto=1`, `?side=left|right` to
+force the facing side, and `window.FILM` for status and results.
+
+---
+
 ## Privacy
 
 - No `MediaRecorder`, no canvas capture-to-file, no uploads, no analytics.
@@ -242,6 +282,14 @@ clears it back to the defaults.
   **Clear history / Clear ghost / Reset self-tuning** controls.
 - The on-screen badge — **"on-device · nothing saved"** — reflects that no video
   is ever recorded, uploaded, or kept.
+- **Film mode (`film.html`)** is the one deliberate exception to the
+  `MediaRecorder` line above, and it applies to `film.html` only, never the live
+  coach. It keeps the rest of the promise. The clip you pick is analysed and rendered **entirely in your browser — nothing is
+  uploaded**, there are no analytics, and it uses no `localStorage`. The only
+  network requests are the MediaPipe library and model weights from the public
+  CDN. A video file is only created, in memory, so the **Download** button has
+  something to save; if you never press it, no file exists, and reloading the
+  page discards everything.
 
 ---
 
