@@ -188,17 +188,20 @@ const MP_WASM    = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VE
 const MODEL_URL  = (v) => `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${v}/float16/1/pose_landmarker_${v}.task`;
 
 const CFG = {
-  // ---- stroke segmentation (ported from index.html updateSegmentation) ----
-  EMA_FAST: 0.35,        // lean / knee / arm smoothing
-  EMA_SIG: 0.4,          // hip-compression signal smoothing
-  SIG_WINDOW_MS: 2500,   // signal history kept for peak finding
+  // ---- stroke segmentation (same idea as index.html updateSegmentation, but run over the whole stored clip) ----
+  EMA_FAST: 0.5,         // lean / knee / arm smoothing, per pass (applied forward AND backward = zero lag)
+  EMA_SIG: 0.5,          // hip-compression signal smoothing, per pass (forward + backward)
+  SIG_WINDOW_MS: 2500,   // window (centred on each sample) that sets the local swing amplitude
   MIN_HALF_MS: 250,      // min time between a catch and a finish
-  SWING_FRAC: 0.4,       // each extreme must be >= 40% of the window amplitude from the last opposite one
-  /* The hip often sits near its extreme for a few hundred ms at the finish (hands away and body rock-over happen
-     before the slide starts), so the argmin of the hip signal lands anywhere in that plateau and inflates the drive
-     time. On a recorded clip we can look back, so the FINISH is moved to when the hip FIRST arrives within 4% of
-     the stroke's swing of its extreme. The live coach can't look back, which is why it doesn't do this. */
+  SWING_FRAC: 0.4,       // each extreme must be >= 40% of the local amplitude from the last opposite one
+  /* The hip sits near each extreme for a few hundred ms (at the finish: hands away + body rock-over before the slide
+     starts; at the catch: the slide often stalls just short of full compression), so the raw argmax / argmin of the
+     hip signal lands anywhere in that plateau. On a recorded clip we can look back, so BOTH the catch and the finish
+     are moved to when the hip FIRST arrives within 4% of the stroke's swing of its extreme. One definition of "catch"
+     is used for everything: it closes the previous stroke AND opens the next one. The live coach can't look back,
+     which is why it doesn't do this. */
   FINISH_ARRIVE_FRAC: 0.04,
+  CATCH_ARRIVE_FRAC: 0.04,
   /* Amplitude gate, in TORSO LENGTHS (median shoulder->hip distance in px) instead of the live coach's
      0.04 of frame width. On an erg the hip slides well over a torso-length per stroke (~0.7 m of seat travel
      vs ~0.5 m torso) while idle sway / pose jitter stays under ~0.1. The live gate (0.04 of frame width) is
@@ -210,10 +213,22 @@ const CFG = {
   GAP_MS: 500,           // a pose gap longer than this resets the detector
   SIDE_LOCK_MS: 1000,    // side (left/right-facing) is decided from the first second of posed frames
   SAMPLE_MS: 1000 / 30,  // sample at <= 30 fps
-  // ---- sequencing (legs -> body -> arms) ----
-  LEGS_GO_FRAC: 0.12,    // leg-extension progress past which the legs have "gone"
-  BODY_GO_DELTA: 4,      // degrees of back-opening past which the body has "gone"
-  ARMS_GO_DELTA: 0.04,   // drop in wrist->shoulder distance, in TORSO LENGTHS (already scale-free in pixel space)
+  /* ---- sequencing (legs -> body -> arms) ----
+     Measured after segmentation, per stroke, on the stored traces. Each of legs (knee opening), body (trunk opening)
+     and arms (wrist->shoulder distance shrinking) is turned into an "engagement" signal that RISES during the drive.
+     A segment has "gone" when its signal has climbed SEQ_GO_FRAC of its OWN drive excursion above its running trough
+     and stays there for SEQ_PERSIST_MS. Fixed absolute thresholds (index.html's 12% of leg range / 4 deg / 0.04 torso)
+     are not comparable across segments (a 4 deg trunk wobble or a straight arm tilting is ~0.04 torso, far less
+     effort than 12% of the knee range), and a catch that is a few frames early or late left them measuring
+     against the wrong baseline. The trough is searched from SEQ_PRE_MS before the catch so a lean or arm peak that
+     slightly leads/lags the hip catch is still found. */
+  SEQ_GO_FRAC: 0.15,
+  SEQ_PERSIST_MS: 100,   // the change must hold this long (rejects a noise spike at the catch)
+  SEQ_PRE_MS: 200,       // trough search starts this long before the catch
+  SEQ_POST_MS: 200,      // extremes are looked for up to this long past the hip's finish (capped at 30% of the recovery)
+  SEQ_MIN_EXC_LEGS: 15,  // deg of knee opening a drive must show before "legs" counts as having moved at all
+  SEQ_MIN_EXC_BODY: 8,   // deg of trunk opening
+  SEQ_MIN_EXC_ARMS: 0.10, // wrist->shoulder distance change, in TORSO LENGTHS (scale-free in pixel space)
   // ---- summary ----
   DEV_WARN: 2.0,         // robust-SDs from the clip median that flag a stroke
 };
@@ -304,10 +319,26 @@ function trunkLean(j, feetX) {
   return Math.sign(feetX - j.hip.x) === Math.sign(j.sh.x - j.hip.x) ? fromVertical : -fromVertical;
 }
 const kneeAngle = (j) => angleDeg(j.hip.x, j.hip.y, j.knee.x, j.knee.y, j.ankle.x, j.ankle.y);
-/** Knee angle -> 0..1 leg-extension proxy (0 = fully compressed at the catch, 1 = legs straight). The 70 deg floor is
- *  index.html's; the detector lowers it to the rower's own catch angle so a tighter catch (< 70 deg) still registers. */
-function legExtension(kneeDeg, floorDeg = 70) {
-  return isFiniteNum(kneeDeg) ? clamp((kneeDeg - floorDeg) / (175 - floorDeg), 0, 1) : NaN;
+/** Zero-lag smoothing for a stored clip: EMA forward then EMA backward, so no signal lags another and catch / finish /
+ *  onset times are not pushed late. Non-finite samples are bridged (the neighbour's value carries over). */
+function smoothZP(arr, alpha) {
+  const n = arr.length, fwd = new Array(n), out = new Array(n);
+  let p = NaN;
+  for (let i = 0; i < n; i++) { p = ema(p, arr[i], alpha); fwd[i] = p; }
+  p = NaN;
+  for (let i = n - 1; i >= 0; i--) { p = ema(p, fwd[i], alpha); out[i] = p; }
+  return out;
+}
+/** 5-tap running median (rejects a one-frame bad pose before smoothing). A non-finite sample stays non-finite. */
+function median5(arr) {
+  const n = arr.length, out = new Array(n);
+  for (let i = 0; i < n; i++) {
+    if (!isFiniteNum(arr[i])) { out[i] = NaN; continue; }
+    const w = [];
+    for (let k = Math.max(0, i - 2); k <= Math.min(n - 1, i + 2); k++) if (isFiniteNum(arr[k])) w.push(arr[k]);
+    out[i] = median(w);
+  }
+  return out;
 }
 /** Wrist->shoulder horizontal distance in torso lengths (scale-free: pixel x and pixel torso share units). */
 function armCloseness(j) {
@@ -326,10 +357,43 @@ function buildSequence(tLegs, tBody, tArms, tCatch) {
   return { order: items.map((it) => it[0]), onsets, correct };
 }
 
+/** Sample index at which an engagement signal e (it RISES during the drive) has climbed CFG.SEQ_GO_FRAC of its own
+ *  excursion above its running trough and stayed there for CFG.SEQ_PERSIST_MS. Searches samples lo..hi; returns -1
+ *  when the segment barely moved (excursion < minExc). The excursion runs from the trough to the signal's peak. */
+function onsetIndex(t, e, lo, hi, minExc) {
+  let pk = -1;
+  for (let i = lo; i <= hi; i++) if (isFiniteNum(e[i]) && (pk < 0 || e[i] > e[pk])) pk = i;
+  if (pk < 0) return -1;
+  let trough = Infinity;
+  for (let i = lo; i <= pk; i++) if (isFiniteNum(e[i]) && e[i] < trough) trough = e[i];
+  const exc = e[pk] - trough;
+  if (!(exc >= minExc)) return -1;
+  const thr = CFG.SEQ_GO_FRAC * exc;
+  let run = Infinity;                                // running trough: follows any early dip, so only a real rise counts
+  for (let i = lo; i <= pk; i++) {
+    if (!isFiniteNum(e[i])) continue;
+    if (e[i] < run) run = e[i];
+    if (e[i] - run < thr) continue;
+    let holds = true;
+    for (let q = i; q <= pk && t[q] - t[i] <= CFG.SEQ_PERSIST_MS; q++) {
+      if (isFiniteNum(e[q]) && e[q] - run < thr) { holds = false; break; }
+    }
+    if (holds) return i;
+  }
+  return -1;
+}
+
 /**
- * Self-contained stroke segmenter (no globals). Feed it posed frames in time order with push(tMs, landmarks).
- * Signal: compression = -|hip.x - feetX| (px), EMA-smoothed; a 3-sample local max = CATCH, local min = FINISH.
- * A stroke closes at the NEXT catch, so the final partial stroke of a clip is never emitted.
+ * Stroke segmenter + sequencer (no globals). Feed it posed frames in time order with push(tMs, landmarks), then call
+ * finish() once. Each uninterrupted run of frames (a pose gap longer than GAP_MS ends a run) is processed in one go:
+ *   1. Signal: compression = -|hip.x - feetX| (px), smoothed with zero lag. Alternating peaks (CATCH, most compressed)
+ *      and troughs (FINISH) are found with a swing hysteresis, so a catch is exactly one event, never a chain of them.
+ *   2. Each extreme is moved to when the hip FIRST arrives within X% of its swing of that extreme (see CFG).
+ *   3. Stroke k = catch k -> finish k -> catch k+1, all taken from that SAME refined list, so
+ *      period = nextCatchT - catchT, recoveryS = nextCatchT - finishT, driveS = finishT - catchT, and a stroke's
+ *      nextCatchT is exactly the next stroke's catchT.
+ *   4. Legs / body / arms onsets are measured per stroke on the stored traces (CFG.SEQ_*).
+ * The final partial stroke of a clip (no closing catch) is never emitted.
  */
 class StrokeDetector {
   constructor({ side, width, height, torsoPx }) {
@@ -339,21 +403,12 @@ class StrokeDetector {
     this.strokes = [];
     this.gapResets = 0;
     this.lastGoodT = null;
-    this._clear();
+    this.smp = [];                                   // raw per-frame samples of the current run
   }
-  _clear() {
-    this.hipSm = NaN; this.leanSm = NaN; this.kneeSm = NaN; this.armSm = NaN;
-    this.buf = [];
-    this.stroke = [];                                // samples since the last catch (for the finish look-back)
-    this.legFloor = 70;
-    this.lastCatch = null; this.lastFinish = null; this.phase = "idle";
-    this.wrist = [];
-    this.tLegs = null; this.tBody = null; this.tArms = null;
-    this.catchKneeNorm = NaN; this.catchLean = NaN; this.armCatch = NaN;
-    this.kneeMin = NaN; this.kneeMax = NaN;
-  }
-  /** Forget in-flight state after a pose gap; strokes already completed are kept. */
-  reset() { this._clear(); this.gapResets++; }
+  /** A pose gap: process the run so far (completed strokes are kept) and start a fresh run. */
+  reset() { this._flush(); this.smp = []; this.gapResets++; }
+  /** Call once after the last push(): processes the final run. */
+  finish() { this._flush(); this.smp = []; }
 
   /** Returns false when the frame has no usable joints (it is skipped, and may later trigger a gap reset). */
   push(t, lm) {
@@ -362,106 +417,114 @@ class StrokeDetector {
     if (this.lastGoodT != null && t - this.lastGoodT > CFG.GAP_MS) this.reset();
     this.lastGoodT = t;
     const feetX = feetXOf(lm, this.side, this.W, j);
-    const kneeRaw = kneeAngle(j);
-    this.leanSm = ema(this.leanSm, trunkLean(j, feetX), CFG.EMA_FAST);
-    this.kneeSm = ema(this.kneeSm, kneeRaw, CFG.EMA_FAST);
-    this.armSm = ema(this.armSm, armCloseness(j), CFG.EMA_FAST);
-    // Arm extension at the catch = first drive frame, before the arms have gone.
-    if (this.phase === "drive" && this.tArms == null && !isFiniteNum(this.armCatch)) this.armCatch = this.armSm;
-    if (this.phase !== "idle" && j.wrist.visibility >= CFG.VIS_DRAW) this.wrist.push({ t, x: j.wrist.x });
-    this._segment(t, j, feetX);
-    this._sequence(t);
+    const wristOk = j.wrist.visibility >= CFG.VIS_DRAW;
+    this.smp.push({
+      t,
+      hip: -Math.abs(j.hip.x - feetX),               // closer to feet -> larger (the catch is a maximum)
+      lean: trunkLean(j, feetX), knee: kneeAngle(j),
+      arm: wristOk ? armCloseness(j) : NaN,
+      wx: wristOk ? j.wrist.x : NaN,
+    });
     return true;
   }
 
-  _segment(t, j, feetX) {
-    this.hipSm = ema(this.hipSm, -Math.abs(j.hip.x - feetX), CFG.EMA_SIG);   // closer to feet -> larger
-    const buf = this.buf, rec = { t, sig: this.hipSm, lean: this.leanSm };
-    buf.push(rec);
-    if (this.lastCatch) this.stroke.push(rec);
-    while (buf.length && t - buf[0].t > CFG.SIG_WINDOW_MS) buf.shift();
-    if (buf.length < 5) return;
-    let lo = Infinity, hi = -Infinity;
-    for (const s of buf) { if (s.sig < lo) lo = s.sig; if (s.sig > hi) hi = s.sig; }
-    const amp = hi - lo;
-    if (amp < this.minAmp) return;                   // hip barely moving -> not rowing
-    const n = buf.length, a = buf[n - 3], b = buf[n - 2], c = buf[n - 1];
-    const isMax = b.sig > a.sig && b.sig >= c.sig;   // peak   -> CATCH  (most compressed)
-    const isMin = b.sig < a.sig && b.sig <= c.sig;   // trough -> FINISH (most extended)
-    if (isMax) {
-      const okDwell = !this.lastCatch || (b.t - this.lastCatch.t) > CFG.MIN_HALF_MS;
-      const okSwing = !this.lastFinish || (b.sig - this.lastFinish.sig) > amp * CFG.SWING_FRAC;
-      if (okDwell && okSwing) this._onCatch(b);
-    } else if (isMin) {
-      const okDwell = !this.lastFinish || (b.t - this.lastFinish.t) > CFG.MIN_HALF_MS;
-      const okSwing = !this.lastCatch || (this.lastCatch.sig - b.sig) > amp * CFG.SWING_FRAC;
-      if (okDwell && okSwing) this._onFinish(b);
+  /** Alternating CATCH (peak) / FINISH (trough) sample indices of the smoothed hip signal, via a swing hysteresis:
+   *  a peak is confirmed once the signal has fallen SWING_FRAC of the local amplitude below it, and vice versa. */
+  _extremes(t, sig) {
+    const n = sig.length, half = CFG.SIG_WINDOW_MS / 2;
+    const amp = new Array(n);                        // local swing amplitude: range inside a window centred on each sample
+    let l = 0, r = 0;
+    for (let i = 0; i < n; i++) {
+      while (t[i] - t[l] > half) l++;
+      while (r + 1 < n && t[r + 1] - t[i] <= half) r++;
+      let amin = Infinity, amax = -Infinity;
+      for (let q = l; q <= r; q++) { if (sig[q] < amin) amin = sig[q]; if (sig[q] > amax) amax = sig[q]; }
+      amp[i] = amax - amin;
     }
-  }
-
-  _onCatch(b) {
-    const c0 = this.lastCatch, f0 = this.lastFinish;
-    if (c0 && f0 && f0.t > c0.t) {
-      const fin = this._arrival(c0, f0);               // finish = when the hip first reaches its extreme
-      const period = (b.t - c0.t) / 1000, driveS = (fin.t - c0.t) / 1000, recoveryS = (b.t - fin.t) / 1000;
-      if (period > 0.6 && period < 8 && driveS > 0 && recoveryS > 0) {
-        // Handle travel = horizontal spread of the wrist during the drive, in torso lengths.
-        const wx = this.wrist.filter((s) => s.t >= c0.t && s.t <= f0.t).map((s) => s.x);
-        const travel = wx.length >= 3 ? Math.max(...wx) - Math.min(...wx) : NaN;
-        this.strokes.push({
-          index: this.strokes.length + 1,
-          catchT: rnd(c0.t / 1000, 3), finishT: rnd(fin.t / 1000, 3), nextCatchT: rnd(b.t / 1000, 3),
-          period: rnd(period, 3), spm: rnd(60 / period, 1),
-          driveS: rnd(driveS, 3), recoveryS: rnd(recoveryS, 3), ratio: rnd(driveS / recoveryS, 2),
-          catchLeanDeg: rnd(c0.lean, 1),
-          finishLeanDeg: rnd(fin.lean, 1),           // lean at the finish itself, not one sample later
-          kneeMin: rnd(this.kneeMin, 1), kneeMax: rnd(this.kneeMax, 1),
-          strokeLength: rnd(travel / this.torso, 2),
-          sequence: buildSequence(this.tLegs, this.tBody, this.tArms, c0.t),
-        });
+    const ext = [];
+    let state = 0, hi = 0, lo = 0;                   // state: 0 undecided, 1 last extreme was a finish, -1 last was a catch
+    for (let i = 1; i < n; i++) {
+      if (sig[i] > sig[hi]) hi = i;
+      if (sig[i] < sig[lo]) lo = i;
+      if (amp[i] < this.minAmp) continue;            // hip barely moving -> not rowing
+      const R = CFG.SWING_FRAC * amp[i];
+      const last = ext.length ? ext[ext.length - 1].i : -1;
+      if (state >= 0 && sig[hi] - sig[i] >= R && (last < 0 || t[hi] - t[last] >= CFG.MIN_HALF_MS)) {
+        ext.push({ type: "catch", i: hi }); state = -1;
+        lo = hi + 1; for (let q = hi + 1; q <= i; q++) if (sig[q] < sig[lo]) lo = q;
+      } else if (state <= 0 && sig[i] - sig[lo] >= R && (last < 0 || t[lo] - t[last] >= CFG.MIN_HALF_MS)) {
+        ext.push({ type: "finish", i: lo }); state = 1;
+        hi = lo + 1; for (let q = lo + 1; q <= i; q++) if (sig[q] > sig[hi]) hi = q;
       }
     }
-    // A new drive starts at this catch.
-    this.lastCatch = b; this.phase = "drive";
-    this.stroke = this.buf.slice(-2);                // [b, and the sample after it]
-    this.legFloor = isFiniteNum(this.kneeSm) ? Math.min(70, this.kneeSm) : 70;
-    this.catchKneeNorm = legExtension(this.kneeSm, this.legFloor);
-    this.catchLean = isFiniteNum(b.lean) ? b.lean : this.leanSm;
-    this.tLegs = null; this.tBody = null; this.tArms = null;
-    this.armCatch = NaN;
-    this.kneeMin = isFiniteNum(this.kneeSm) ? this.kneeSm : NaN;
-    this.kneeMax = this.kneeMin;
-    this.wrist = [];
-  }
-  _onFinish(b) { this.lastFinish = b; this.phase = "recovery"; }
-
-  /** First sample of this stroke where the hip is within FINISH_ARRIVE_FRAC of its swing from the stroke's true extreme. */
-  _arrival(c0, f0) {
-    let minSig = Infinity;
-    for (const s of this.stroke) if (s.t > c0.t && s.t <= f0.t && s.sig < minSig) minSig = s.sig;
-    const swing = c0.sig - minSig;
-    if (!(swing > 0)) return f0;
-    const thr = minSig + CFG.FINISH_ARRIVE_FRAC * swing;
-    for (const s of this.stroke) if (s.t > c0.t && s.t <= f0.t && s.sig <= thr) return s;
-    return f0;
+    while (ext.length && ext[0].i <= 1) ext.shift(); // an "extreme" on the run's first samples is only where the run began
+    return ext;
   }
 
-  /** During the drive, note when legs / body / arms first engage. */
-  _sequence(t) {
-    if (this.phase !== "drive") return;
-    if (isFiniteNum(this.kneeSm)) {
-      this.kneeMin = isFiniteNum(this.kneeMin) ? Math.min(this.kneeMin, this.kneeSm) : this.kneeSm;
-      this.kneeMax = isFiniteNum(this.kneeMax) ? Math.max(this.kneeMax, this.kneeSm) : this.kneeSm;
+  /** Process the current run: find the extremes, refine them, emit every complete stroke. */
+  _flush() {
+    const smp = this.smp, n = smp.length;
+    if (n < 10) return;
+    const t = smp.map((s) => s.t);
+    const sig = smoothZP(smp.map((s) => s.hip), CFG.EMA_SIG);
+    const ext = this._extremes(t, sig);
+    if (ext.length < 3) return;
+    // One refinement for every extreme: the first sample after the previous (opposite) extreme at which the hip is
+    // within ARRIVE_FRAC of this stroke half-cycle's swing of the extreme. e.i = raw extreme, e.a = arrival.
+    const typical = median(ext.slice(1).map((e, k) => Math.abs(sig[e.i] - sig[ext[k].i])));
+    for (let k = 0; k < ext.length; k++) {
+      const e = ext[k], prev = k ? ext[k - 1] : null;
+      const swing = prev ? Math.abs(sig[e.i] - sig[prev.i]) : typical;
+      const from = prev ? prev.i + 1 : 0;
+      e.a = e.i;
+      if (e.type === "catch") {
+        const thr = sig[e.i] - CFG.CATCH_ARRIVE_FRAC * swing;
+        for (let q = from; q <= e.i; q++) if (sig[q] >= thr) { e.a = q; break; }
+      } else {
+        const thr = sig[e.i] + CFG.FINISH_ARRIVE_FRAC * swing;
+        for (let q = from; q <= e.i; q++) if (sig[q] <= thr) { e.a = q; break; }
+      }
     }
-    if (!isFiniteNum(this.catchKneeNorm) || !isFiniteNum(this.catchLean)) return;
-    const legRange = Math.max(0.0001, 1 - this.catchKneeNorm);
-    const legProgress = isFiniteNum(this.kneeSm)
-      ? clamp((legExtension(this.kneeSm, this.legFloor) - this.catchKneeNorm) / legRange, 0, 1) : NaN;
-    const backOpening = isFiniteNum(this.leanSm) ? this.catchLean - this.leanSm : NaN;
-    if (this.tLegs == null && legProgress > CFG.LEGS_GO_FRAC) this.tLegs = t;
-    if (this.tBody == null && backOpening > CFG.BODY_GO_DELTA) this.tBody = t;
-    if (this.tArms == null && isFiniteNum(this.armSm) && isFiniteNum(this.armCatch)
-        && this.armSm < this.armCatch - CFG.ARMS_GO_DELTA) this.tArms = t;
+    const lean = smoothZP(median5(smp.map((s) => s.lean)), CFG.EMA_FAST);
+    const knee = smoothZP(median5(smp.map((s) => s.knee)), CFG.EMA_FAST);
+    const arm = smoothZP(median5(smp.map((s) => s.arm)), CFG.EMA_FAST);
+    const body = lean.map((v) => -v), arms = arm.map((v) => -v);   // engagement signals: rise as the segment goes
+    for (let k = 0; k + 2 < ext.length; k++) {
+      const c0 = ext[k], f0 = ext[k + 1], c1 = ext[k + 2];
+      // A run's first catch counts only if the run visibly rose into it (a run that starts sitting at the catch has
+      // no observable arrival, and its "catch" would land anywhere in the hold).
+      if (c0.type !== "catch" || (k === 0 && sig[0] > sig[c0.i] - 0.25 * typical)) continue;
+      const tc = rnd(t[c0.a] / 1000, 3), tf = rnd(t[f0.a] / 1000, 3), tn = rnd(t[c1.a] / 1000, 3);
+      const period = rnd(tn - tc, 3), driveS = rnd(tf - tc, 3), recoveryS = rnd(tn - tf, 3);
+      if (!(period > 0.6 && period < 8 && driveS > 0 && recoveryS > 0)) continue;
+      // Drive samples run catch -> the hip's own extreme (not its first arrival), so the leg drive is complete.
+      let kMin = Infinity, kMax = -Infinity, xMin = Infinity, xMax = -Infinity, nx = 0;
+      for (let q = c0.a; q <= f0.i; q++) {
+        if (isFiniteNum(knee[q])) { kMin = Math.min(kMin, knee[q]); kMax = Math.max(kMax, knee[q]); }
+        if (isFiniteNum(smp[q].wx)) { xMin = Math.min(xMin, smp[q].wx); xMax = Math.max(xMax, smp[q].wx); nx++; }
+      }
+      const travel = nx >= 3 ? xMax - xMin : NaN;                  // handle travel = wrist x spread over the drive (pixels here; divided by torso length when the stroke is built)
+      // Sequencing window: PRE before the catch to a little past the hip's extreme (never into the next catch).
+      let lo = c0.a; while (lo > 0 && t[c0.a] - t[lo - 1] <= CFG.SEQ_PRE_MS) lo--;
+      const post = Math.min(CFG.SEQ_POST_MS, 0.3 * (t[c1.a] - t[f0.i]));
+      let hi = f0.i; while (hi + 1 < c1.a && t[hi + 1] - t[f0.i] <= post) hi++;
+      const at = (i) => (i < 0 ? null : t[i]);
+      this.strokes.push({
+        index: this.strokes.length + 1,
+        catchT: tc, finishT: tf, nextCatchT: tn,
+        period, spm: rnd(60 / period, 1),
+        driveS, recoveryS, ratio: rnd(driveS / recoveryS, 2),
+        catchLeanDeg: rnd(lean[c0.a], 1),
+        finishLeanDeg: rnd(lean[f0.a], 1),           // lean at the finish itself
+        kneeMin: rnd(kMin, 1), kneeMax: rnd(kMax, 1),
+        strokeLength: rnd(travel / this.torso, 2),
+        sequence: buildSequence(
+          at(onsetIndex(t, knee, lo, hi, CFG.SEQ_MIN_EXC_LEGS)),
+          at(onsetIndex(t, body, lo, hi, CFG.SEQ_MIN_EXC_BODY)),
+          at(onsetIndex(t, arms, lo, hi, CFG.SEQ_MIN_EXC_ARMS)),
+          t[c0.a]),
+      });
+    }
   }
 }
 
@@ -493,6 +556,7 @@ function analyseFrames(frames, W, H, sideOverride) {
   const torsoPx = median(torsos);
   const det = new StrokeDetector({ side, width: W, height: H, torsoPx });
   for (const f of posed) det.push(f.t, f.lm);
+  det.finish();                                      // segments the last run (strokes are found over the whole stored clip)
   return { side, sideFlipsRaw, torsoPx, strokes: det.strokes, gapResets: det.gapResets, usable: torsos.length };
 }
 
@@ -546,6 +610,7 @@ const qs = new URLSearchParams(location.search);
 const SIDE_OVERRIDE = ["left", "right"].includes(qs.get("side")) ? qs.get("side") : null;
 const SRC_PARAM = qs.get("src");
 const AUTO = qs.get("auto") === "1";
+const DEBUG = qs.get("debug") === "1";   // ?debug=1 exposes FILM.debug so segmentation can be re-run from the console (module vars are not reachable otherwise)
 
 let resolveDone, rejectDone;
 const FILM = window.FILM = {
@@ -872,15 +937,21 @@ function drawComposite(tMs, st) {
  * ------------------------------------------------------------------------- */
 const HAS_RVFC = typeof HTMLVideoElement !== "undefined" && "requestVideoFrameCallback" in HTMLVideoElement.prototype;
 function onFrames(video, cb) {
-  let on = true, last = -1;
+  let on = true, lastMs = -1, lastTick = performance.now();
+  const emit = (ms) => { if (ms > lastMs) { lastMs = ms; cb(ms); } };
   const tick = (now, meta) => {
     if (!on) return;
-    if (meta) cb(meta.mediaTime * 1000);
-    else if (video.currentTime !== last) { last = video.currentTime; cb(last * 1000); }
+    lastTick = performance.now();
+    emit(meta ? meta.mediaTime * 1000 : video.currentTime * 1000);
     if (HAS_RVFC) video.requestVideoFrameCallback(tick); else requestAnimationFrame(() => tick());
   };
   if (HAS_RVFC) video.requestVideoFrameCallback(tick); else requestAnimationFrame(() => tick());
-  return () => { on = false; };
+  // Timer fallback: when the page stops painting (window hidden/occluded) rVFC and rAF go silent
+  // while the video keeps playing, so poll currentTime whenever the paint-driven ticks go quiet.
+  const timer = setInterval(() => {
+    if (on && !video.paused && performance.now() - lastTick > 250) emit(video.currentTime * 1000);
+  }, 33);
+  return () => { on = false; clearInterval(timer); };
 }
 function seekTo(sec) {
   return new Promise((res) => {
@@ -928,50 +999,25 @@ async function loadModel() {
  *  Pass 1 -- ANALYSE: play muted at 1x, sample <= 30 fps, store 33 landmarks per frame.
  *  If detection is slower than real time the playback rate drops (0.5 -> 0.25 -> 0.125).
  * ------------------------------------------------------------------------- */
-const RATES = [1, 0.5, 0.25, 0.125];
-function analyse(landmarker) {
-  return new Promise((resolve, reject) => {
-    const v = srcVideo, durMs = v.duration * 1000;
-    let lastT = -Infinity, rate = 1, win = [], seen = 0, lastCb = performance.now();
-    v.playbackRate = 1;
-    const guard = setInterval(() => {
-      if (performance.now() - lastCb > 20000) { cleanup(); reject(new Error("Video playback stalled while analysing. Keep this tab in front and try again.")); }
-    }, 2000);
-    const stop = onFrames(v, (tMs) => {
-      lastCb = performance.now();
-      const t = Math.round(tMs);
-      if (t > lastT && t - lastT >= CFG.SAMPLE_MS - 2) {          // strictly increasing, <= 30 fps
-        const t0 = performance.now();
-        let res = null;
-        try { res = landmarker.detectForVideo(v, t); } catch (e) { console.warn("detectForVideo failed", e); }
-        const dt = performance.now() - t0;
-        const lms = res && res.landmarks && res.landmarks[0];
-        frames.push({ t, ok: !!lms, lm: lms ? packLandmarks(lms) : null });
-        lastT = t;
-        FILM.frames.total = frames.length;
-        if (lms) FILM.frames.withPose++;
-        if (++seen > 5) {                                          // skip warm-up inferences when timing
-          win.push(dt);
-          if (win.length >= 12) {
-            const need = 0.85 * CFG.SAMPLE_MS / mean(win);        // playback rate at which detection keeps up
-            win = [];
-            if (need < rate) {
-              rate = RATES.find((r) => r <= need) || RATES[RATES.length - 1];
-              v.playbackRate = rate; analysedRate = rate;
-              $("stNote").textContent = `This device is slower than real time, so the clip is analysed at ${rate}× speed.`;
-            }
-          }
-        }
-      }
-      setStageProgress(durMs ? tMs / durMs : 0);
-      const pct = Math.round(clamp(tMs / durMs, 0, 1) * 100);
-      drawComposite(tMs, { msg: "ANALYSING", sub: `${pct}% · ${FILM.frames.withPose}/${frames.length} frames with a body` });
-    });
-    function cleanup() { stop(); clearInterval(guard); v.onended = null; v.onerror = null; v.pause(); }
-    v.onended = () => { cleanup(); resolve(); };
-    v.onerror = () => { cleanup(); reject(new Error("The video stopped working part-way through.")); };
-    v.play().catch((e) => { cleanup(); reject(new Error("The browser wouldn't play the clip: " + (e && e.message ? e.message : e))); });
-  });
+/* Seek-stepped rather than played: each sampled frame is decoded by seeking to it, so analysis never
+   depends on real-time playback, screen painting or device speed -- a slow phone just takes longer
+   instead of dropping frames. */
+async function analyse(landmarker) {
+  const v = srcVideo, durMs = v.duration * 1000;
+  v.pause();
+  for (let tMs = 0; tMs <= durMs; tMs = Math.round(tMs + CFG.SAMPLE_MS)) {   // strictly increasing, <= 30 fps
+    const stalled = new Promise((_, rej) => setTimeout(() => rej(new Error("The video stopped responding while analysing. Try again, or re-save the clip.")), 15000));
+    await Promise.race([seekTo(tMs / 1000), stalled]);
+    let res = null;
+    try { res = landmarker.detectForVideo(v, tMs); } catch (e) { console.warn("detectForVideo failed", e); }
+    const lms = res && res.landmarks && res.landmarks[0];
+    frames.push({ t: tMs, ok: !!lms, lm: lms ? packLandmarks(lms) : null });
+    FILM.frames.total = frames.length;
+    if (lms) FILM.frames.withPose++;
+    setStageProgress(durMs ? tMs / durMs : 0);
+    const pct = Math.round(clamp(tMs / durMs, 0, 1) * 100);
+    drawComposite(tMs, { msg: "ANALYSING", sub: `${pct}% · ${FILM.frames.withPose}/${frames.length} frames with a body` });
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1134,7 +1180,9 @@ async function run() {
 
     setStatus("segmenting", "Finding catches and finishes.");
     await sleep(30);                                  // let the status paint
+    if (DEBUG) FILM.debug = { frames, W: vw, H: vh, side: SIDE_OVERRIDE, analyseFrames, summarise, CFG };   // set before analysis so it survives a throw
     const res = analyseFrames(frames, vw, vh, SIDE_OVERRIDE);
+    if (DEBUG) FILM.debug.side = res.side;
     FILM.side = res.side; FILM.sideFlipsRaw = res.sideFlipsRaw; FILM.poseGapResets = res.gapResets;
     FILM.frames.total = frames.length; FILM.frames.withPose = frames.filter((f) => f.ok).length; FILM.frames.usable = res.usable;
     FILM.strokes = res.strokes;
