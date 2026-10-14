@@ -221,6 +221,7 @@ const CFG = {
   GAP_MS: 500,           // a pose gap longer than this resets the detector
   SIDE_LOCK_MS: 1000,    // side (left/right-facing) is decided from the first second of posed frames
   SAMPLE_MS: 1000 / 30,  // sample at <= 30 fps
+  SEEK_TOL_MS: 100,      // a seek that lands further than this from its target means the media can't be seeked (see seekTo)
   /* ---- sequencing (legs -> body -> arms) ----
      Measured after segmentation, per stroke, on the stored traces. Each of legs (hip travel away from the feet = the
      seat sliding), body (trunk opening) and arms (elbow flexing) is turned into an "engagement" signal that RISES
@@ -986,11 +987,30 @@ function onFrames(video, cb) {
   return () => { on = false; clearInterval(timer); };
 }
 function seekTo(sec) {
-  return new Promise((res) => {
+  return new Promise((res, rej) => {
     if (Math.abs(srcVideo.currentTime - sec) < 0.001 && srcVideo.readyState >= 2) return res();
-    srcVideo.onseeked = () => { srcVideo.onseeked = null; res(); };
+    srcVideo.onseeked = () => {
+      srcVideo.onseeked = null;
+      // An unseekable media (seekable = [0,0]) clamps every currentTime write to 0 yet still fires "seeked" with readyState 4,
+      // so every later sample would be the SAME frame: flat landmarks, no strokes, no error. Say so instead.
+      if (Math.abs(srcVideo.currentTime - sec) > CFG.SEEK_TOL_MS / 1000) {
+        rej(new Error("This video can't be stepped through frame by frame (the player refused to seek). Choose the file from your device instead of opening it from a link, or re-save the clip."));
+      } else res();
+    };
     srcVideo.currentTime = sec;
   });
+}
+/** Seek-stepped analysis needs a seekable element. A plain http(s) source is only seekable when the server answers Range
+ *  requests (Chrome also treats a freshly fetched clip from a Range-less server as a stream until it is in the HTTP cache):
+ *  otherwise `seekable` is [0,0] and every seek is silently clamped to 0. A blob: URL is always seekable, so fetch the clip
+ *  once and play that. If the fetch fails (CORS, offline) the direct URL is used and seekTo() reports a failed seek. */
+async function seekableUrl(url) {
+  if (/^(blob|data):/i.test(url)) return url;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return URL.createObjectURL(await r.blob());
+  } catch (e) { console.warn("couldn't prefetch the clip; playing it straight from its URL", e); return url; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1243,8 +1263,9 @@ async function run() {
 /* ---------------------------------------------------------------------------
  *  Input: file picker, drop zone, and the ?src= / &auto=1 test hooks
  * ------------------------------------------------------------------------- */
-function openClip(url, name) {
+async function openClip(url, name) {
   clipName = name;
+  url = await seekableUrl(url);
   return new Promise((resolve, reject) => {
     srcVideo.onloadedmetadata = () => {
       vw = srcVideo.videoWidth; vh = srcVideo.videoHeight;
