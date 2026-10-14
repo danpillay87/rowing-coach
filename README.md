@@ -228,7 +228,9 @@ clears it back to the defaults.
 The live coach watches you row and never records. **Film mode** is its
 after-the-fact sibling: give it a recorded side-on clip and it hands you back an
 annotated video. Open it from **⋯ → Film a session →**, or go straight to
-`film.html`.
+`film.html`. No clip handy? **Try a sample** runs a 15 s stock rowing clip
+(`samples/rowing-sample.mp4`, from [Mixkit](https://mixkit.co/), free licence)
+through the same pipeline.
 
 **How to use it**
 
